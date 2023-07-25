@@ -35,6 +35,7 @@ LOG_MODULE_REGISTER(phy_adinx11x, CONFIG_PHY_LOG_LEVEL);
 
 /* ADINX11X PHY identifier */
 #define ADIN2111_PHY_ID						0x0283BCA1U
+#define ADIN1110_PHY_ID						0x0283BC91U
 
 /* 10BASE-T1L PMA Status Register */
 #define ADINX11X_PHY_PMA_STATUS					0x000108F7U
@@ -353,7 +354,7 @@ static int phy_adinx11x_init(const struct device *dev)
 		return -ENODEV;
 	}
 
-	if (phy_id != ADIN2111_PHY_ID) {
+	if (phy_id != ADIN2111_PHY_ID && phy_id != ADIN1110_PHY_ID) {
 		LOG_ERR("PHY %u unexpected PHY ID %X", cfg->phy_addr, phy_id);
 		return -EINVAL;
 	}

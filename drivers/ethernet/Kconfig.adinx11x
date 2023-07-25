@@ -4,7 +4,7 @@
 menuconfig ETH_ADINX11X
 	bool "ADINX11X 10BASE-T1L Controller"
 	default y
-	depends on DT_HAS_ADI_ADIN2111_ENABLED
+	depends on DT_HAS_ADI_ADIN2111_ENABLED || DT_HAS_ADI_ADIN1110_ENABLED
 	select SPI
 	select MDIO
 	help
@@ -14,6 +14,16 @@ menuconfig ETH_ADINX11X
 	  Mbps single pair Ethernet (SPE).
 
 if ETH_ADINX11X
+
+config ETH_ADIN1110
+	bool "ADIN1110 10BASE-T1L Controller"
+	default y
+	depends on DT_HAS_ADI_ADIN1110_ENABLED
+	help
+	  The ADIN1110 is a low power, single-port 10BASE-T1L transceiver
+	  designed for industrial Ethernet applications, and is compliant with
+	  the IEEE® 802.3cg-2019™ Ethernet standard for long reach, 10
+	  Mbps single pair Ethernet (SPE).
 
 config ETH_ADIN2111
 	bool "ADIN2111 10BASE-T1L Controller"
