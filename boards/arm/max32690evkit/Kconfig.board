@@ -1,0 +1,8 @@
+# MAX32690 board configuration
+
+# Copyright (c) 2023 Analog Devices, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_MAX32690EVKIT
+	bool "MAX32690EVKIT"
+	depends on SOC_MAX32690

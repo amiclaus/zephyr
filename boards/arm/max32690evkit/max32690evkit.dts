@@ -1,0 +1,139 @@
+/*
+ * Copyright (c) 2023 Analog Devices, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <adi/max32690.dtsi>
+#include <adi/max32690-pinctrl.dtsi>
+
+/ {
+	model = "Analog Devices MAX32690EVKIT";
+	compatible = "adi,max32690evkit";
+
+	chosen {
+		zephyr,console = &uart2;
+		zephyr,shell-uart = &uart2;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		red_led: led_0 {
+			gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+			label = "LED0";
+		};
+		green_led: led_1 {
+			gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
+			label = "LED1";
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+		pb0: pb0 {
+			/* SW2 on EVKIT connects to GPIO4 which does not support interrupts,
+			 * so advised to fit jumper on JH5 to connect SW2 (P4.0) to P2.29
+			 */
+			gpios = <&gpio2 29 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "SW2";
+		};
+	};
+
+	aliases {
+		led0 = &red_led;
+		led1 = &green_led;
+		sw0 = &pb0;
+		rtc = &rtc;
+	 };
+};
+
+&clk_ipo {
+	status = "okay";
+};
+
+/*
+ * ERTCO requires for RTC
+ */
+&clk_ertco {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+};
+
+&uart2 {
+	pinctrl-0 = <&uart2a_tx_p1_10 &uart2a_rx_p1_9>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	parity = "none";
+	status = "okay";
+};
+
+&spi0 {
+	pinctrl-0 = <&spi0b_ss1_p2_26 &spi0b_miso_p2_27
+				&spi0b_mosi_p2_28 &spi0b_sck_p2_29>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&dma0 {
+	status = "okay";
+};
+
+&clk_ipo {
+	status = "okay";
+};
+
+&rtc {
+	status = "okay";
+	alarms-count = <1>;
+};
+
+&timer0 {
+	status = "okay";
+	pwm0: pwm {
+		status = "okay";
+		pinctrl-0 = <&tmr0c_ioa_p0_4>;
+		pinctrl-names = "default";
+	};
+};
+
+&timer1 {
+	status = "okay";
+	pwm1: pwm {
+		status = "disabled";
+		pinctrl-0 = <&tmr1c_ioa_p0_15>;
+		pinctrl-names = "default";
+	};
+};
+
+&timer2 {
+	status = "okay";
+	pwm2: pwm {
+		status = "disabled";
+		pinctrl-0 = <&tmr2c_ioa_p2_20>;
+		pinctrl-names = "default";
+	};
+};
+
+&timer3 {
+	status = "okay";
+	pwm3: pwm {
+		status = "disabled";
+		pinctrl-0 = <&tmr3c_ioa_p2_30>;
+		pinctrl-names = "default";
+	};
+};

@@ -1,0 +1,15 @@
+identifier: max32690evkit
+name: max32690evkit
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+supported:
+  - gpio
+  - serial
+  - i2c
+  - spi
+ram: 1024
+flash: 3072
