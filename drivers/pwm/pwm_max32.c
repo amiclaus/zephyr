@@ -15,7 +15,7 @@
 #include <zephyr/drivers/reset.h>
 #include <zephyr/sys/util_macro.h>
 
-#include <tmr.h>
+#include <wrap_max32_tmr.h>
 
 #include <zephyr/logging/log.h>
 
@@ -28,7 +28,7 @@ LOG_MODULE_REGISTER(pwm_max32, CONFIG_PWM_LOG_LEVEL);
 struct max32_pwm_config {
 	/** Timer register. */
 	mxc_tmr_regs_t *regs;
-	mxc_tmr_cfg_t *cfg;
+	wrap_mxc_tmr_cfg_t *cfg;
 };
 
 /** PWM data. */
@@ -41,17 +41,21 @@ static int pwm_max32_set_cycles(const struct device *dev, uint32_t channel, uint
 				uint32_t pulse_cycles, pwm_flags_t flags)
 {
 	mxc_tmr_regs_t *regs = TMR_CFG(dev)->regs;
-	mxc_tmr_cfg_t cfg;
+	wrap_mxc_tmr_cfg_t cfg;
 	int ret;
 
 	cfg.pres = TMR_PRES_1;
 	cfg.mode = TMR_MODE_PWM;
 	cfg.cmp_cnt = period_cycles;
 	cfg.pol = 1;
+	
+#if defined(CONFIG_SOC_MAX32690) || (CONFIG_SOC_MAX32655)
+	cfg.clock = MXC_TMR_APB_CLK;
+#endif 
 
 	MXC_TMR_Shutdown(regs);
 
-	MXC_TMR_Init(regs, &cfg);
+	Wrap_MXC_TMR_Init(regs, &cfg);
 
 	ret = MXC_TMR_SetPWM(regs, pulse_cycles);
 	if (ret != E_NO_ERROR) {
@@ -79,7 +83,7 @@ static const struct pwm_driver_api pwm_max32_driver_api = {
 static int pwm_max32_init(const struct device *dev)
 {
 	mxc_tmr_regs_t *regs = TMR_CFG(dev)->regs;
-	mxc_tmr_cfg_t cfg;
+	wrap_mxc_tmr_cfg_t cfg;
 	int ret;
 
 	MXC_TMR_Shutdown(regs);
@@ -89,7 +93,7 @@ static int pwm_max32_init(const struct device *dev)
 	cfg.cmp_cnt = PeripheralClock;
 	cfg.pol = 1;
 
-	MXC_TMR_Init(regs, &cfg);
+	Wrap_MXC_TMR_Init(regs, &cfg);
 
 	ret = MXC_TMR_SetPWM(regs, 0);
 	if (ret != E_NO_ERROR) {
