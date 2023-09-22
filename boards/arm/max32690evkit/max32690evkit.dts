@@ -93,10 +93,6 @@
 	status = "okay";
 };
 
-&clk_ipo {
-	status = "okay";
-};
-
 &rtc {
 	status = "okay";
 	alarms-count = <1>;
