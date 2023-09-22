@@ -14,8 +14,6 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/clock_control/adi_max32_clock_control.h>
 #include <zephyr/logging/log.h>
-
-#include <zephyr/logging/log.h>
 #include <zephyr/irq.h>
 
 #include <wrap_max32_spi.h>
@@ -115,61 +113,79 @@ static int spi_max32_transceive(const struct device *dev, const struct spi_confi
 				const struct spi_buf_set *rx_bufs)
 {
 	int ret = 0;
-	int i;
+	int i, n = 0;
 	mxc_spi_req_t req;
-	int nb_tx_packet = tx_bufs->count;
-	int nb_rx_packet = rx_bufs->count;
-	int nb_of_packet = MAX(nb_tx_packet, nb_rx_packet);
-	bool hw_cs_ctrl;
+	int rx_len = 0;
+	int tx_len = 0;	
+	int nul_rx_len = 0;
+	bool hw_cs_ctrl = true;
 
 	ret = spi_configure(dev, config);
 	if (ret != 0) {
-		return -1;
+		return -EIO;
 	}
 
-	/* Check CS GPIO exist or not */
-	if (!spi_cs_is_gpio(config)) {
-		hw_cs_ctrl = true;
-	} else {
+	/* Check if CS GPIO exists */ 
+	if (spi_cs_is_gpio(config)) {
 		hw_cs_ctrl = false;
 	}
 	MXC_SPI_HWSSControl(SPI_CFG(dev)->regs, hw_cs_ctrl);
 
-	/* Assert the CS line if hw control disabled */
+	/* Assert the CS line if HW control disabled */
 	if (!hw_cs_ctrl) {
 		spi_context_cs_control(&SPI_DATA(dev)->ctx, true);
 	}
 
 	req.spi = SPI_CFG(dev)->regs;
 
-	for (i = 0; i < nb_of_packet; i++) {
-
-		if (tx_bufs->buffers && tx_bufs->buffers[i].buf) {
-			req.txData = (uint8_t *)tx_bufs->buffers[i].buf;
-			req.txLen = tx_bufs->buffers[i].len;
-		} else {
-			req.txData = NULL;
-			req.txLen = 0;
+	if (tx_bufs) {
+		/* Get total tx length */
+		for (i = 0; i < tx_bufs->count; i++) {
+			tx_len += tx_bufs->buffers[i].len;
 		}
+		req.txData = (uint8_t *)tx_bufs->buffers->buf;
+		req.txLen = tx_len;
+	} else {
+		req.txData = NULL;
+		req.txLen = 0;
+	}
 
-		if (rx_bufs->buffers && rx_bufs->buffers[i].buf) {
-			req.rxData = (uint8_t *)rx_bufs->buffers[i].buf;
-			req.rxLen = rx_bufs->buffers[i].len;
-		} else {
-			req.rxData = NULL;
-			req.rxLen = 0;
+	if (rx_bufs) { 
+		/* Get total rx length */
+		for (i = 0; i < rx_bufs->count; i++) {
+			rx_len += rx_bufs->buffers[i].len;
 		}
-
-		req.ssIdx = config->slave;
-		req.ssDeassert = 1;
-		req.txCnt = 0;
-		req.rxCnt = 0;
-
-		ret = MXC_SPI_MasterTransaction(&req);
-		if (ret) {
-			/* ret = -EIO; */
-			break;
+		/* Get first non-null rx spi_buf, store null buffer(s) length */
+		while (rx_bufs->buffers[n].buf == NULL) {
+			nul_rx_len += rx_bufs->buffers[n].len;
+			n++;
 		}
+		/* Ignore nul_rx_len bytes */
+		req.rxData = (uint8_t *)rx_bufs->buffers[n].buf - nul_rx_len;
+		req.rxLen = rx_len; 
+	} else {
+		req.rxData = NULL;
+		req.rxLen = 0;
+	}
+
+	if (rx_len > tx_len) {
+		/* Need to send dummy bytes, such that tx len = rx len
+		 * We will use the rx data buffer, initialized to 0 */
+		memset(req.rxData, 0, rx_len);
+		memcpy(req.rxData, tx_bufs->buffers->buf, tx_len);
+		req.txData = req.rxData;
+		req.txLen = rx_len;
+	}
+
+	req.ssIdx = config->slave;
+	req.ssDeassert = 1;
+	req.txCnt = 0;
+	req.rxCnt = 0;
+
+	ret = MXC_SPI_MasterTransaction(&req); 
+
+ 	if (ret) {
+		ret = -EIO;
 	}
 
 	/* Deassert the CS line if hw control disabled */
@@ -182,7 +198,6 @@ static int spi_max32_transceive(const struct device *dev, const struct spi_confi
 
 static int spi_max32_release(const struct device *dev, const struct spi_config *config)
 {
-
 	return 0;
 }
 
