@@ -261,6 +261,14 @@
 			status = "disabled";
 		};
 
+		wdt0: watchdog@40003000  {
+			compatible = "adi,max32-watchdog";
+			reg = <0x40003000 0x400>;
+			interrupts = <1 0>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 27>;
+			status = "disabled";
+		};
+
 		timer0: timer@40010000 {
 			compatible = "adi,max32-timer";
 			reg = <0x40010000 0x1000>;
