@@ -16,7 +16,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(wdt_max32);
 
-#include <wdt.h>
+#include <wrap_max32_wdt.h>
 
 #define WDT_CFG(dev)  ((struct max32_wdt_config *)((dev)->config))
 #define WDT_DATA(dev) ((struct max32_wdt_data *)((dev)->data))
@@ -84,6 +84,7 @@ static int api_setup(const struct device *dev, uint8_t options)
 static int api_install_timeout(const struct device *dev, const struct wdt_timeout_cfg *cfg)
 {
 	struct max32_wdt_data *data = dev->data;
+	wrap_mxc_wdt_cfg_t w_cfg;
 
 	if ((cfg->window.min != 0U) || (cfg->window.max == 0U)) {
 		return -EINVAL;
@@ -93,8 +94,10 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 	data->callback = cfg->callback;
 
 	int period = 31 - wdt_max32_calculate_timeout(data->timeout);
+	
+	w_cfg.upperResetPeriod = period;
 
-	MXC_WDT_SetResetPeriod(WDT_CFG(dev)->regs, (mxc_wdt_period_t)(period));
+	Wrap_MXC_WDT_SetResetPeriod(WDT_CFG(dev)->regs, &w_cfg);
 
 	return 0;
 }
@@ -105,8 +108,8 @@ static int wdt_max32_init(const struct device *dev)
 	mxc_wdt_regs_t *regs = WDT_CFG(dev)->regs;
 	const struct max32_wdt_config *const cfg = dev->config;
 
-	/* WDT Disable */
-	MXC_WDT_Init(regs);
+	/* WDT Init */
+	Wrap_MXC_WDT_Init(regs, cfg);
 
 	/* enable clock */
 	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
