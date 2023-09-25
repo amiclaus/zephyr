@@ -4,6 +4,9 @@
 CONFIG_SOC_SERIES_MAX32=y
 CONFIG_SOC_MAX32690=y
 
+# Enable HEX output, requires for west flash
+CONFIG_BUILD_OUTPUT_HEX=y
+
 # Enable GPIO
 CONFIG_GPIO=y
 
@@ -33,5 +36,3 @@ CONFIG_DMA=y
 
 # Enable RTC
 CONFIG_RTC=y
-
-CONFIG_BUILD_OUTPUT_HEX=y

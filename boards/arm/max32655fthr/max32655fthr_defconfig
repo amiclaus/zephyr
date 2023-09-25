@@ -4,6 +4,9 @@
 CONFIG_SOC_SERIES_MAX32=y
 CONFIG_SOC_MAX32655=y
 
+# Enable HEX output, requires for west flash
+CONFIG_BUILD_OUTPUT_HEX=y
+
 # Enable GPIO
 CONFIG_GPIO=y
 
