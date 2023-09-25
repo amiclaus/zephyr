@@ -239,7 +239,7 @@
 			reg = <0x40010000 0x1000>;
 			interrupts = <5 0>;
 			status = "disabled";
-
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 15>;
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
@@ -252,7 +252,7 @@
 			reg = <0x40011000 0x1000>;
 			interrupts = <6 0>;
 			status = "disabled";
-
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 16>;
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
@@ -265,7 +265,7 @@
 			reg = <0x40012000 0x1000>;
 			interrupts = <7 0>;
 			status = "disabled";
-
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 17>;
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
@@ -278,7 +278,7 @@
 			reg = <0x40013000 0x1000>;
 			interrupts = <8 0>;
 			status = "disabled";
-
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 18>;
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
