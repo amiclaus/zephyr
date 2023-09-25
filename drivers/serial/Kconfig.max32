@@ -10,11 +10,8 @@ config UART_MAX32
 	select SERIAL_HAS_DRIVER
 	select SERIAL_SUPPORT_INTERRUPT
 	# the ASYNC implementation requires a DMA controller
-	#select SERIAL_SUPPORT_ASYNC \
-	#	if DT_HAS_ST_STM32_DMA_V1_ENABLED || \
-	#	   DT_HAS_ST_STM32_DMA_V2_ENABLED || \
-	#	   DT_HAS_ST_STM32_DMA_V2BIS_ENABLED
-	#select DMA if UART_ASYNC_API
+	select SERIAL_SUPPORT_ASYNC if DT_HAS_ADI_MAX32_DMA_ENABLED
+	select DMA if UART_ASYNC_API
 	help
 	  This option enables the UART driver for MAX32 family of
 	  processors.

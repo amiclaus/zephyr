@@ -204,7 +204,7 @@ static int uart_max32_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) & (cfg->perclk));
 	if (ret != 0) {
 		LOG_ERR("cannot enable UART clock");
 		return ret;
@@ -355,6 +355,57 @@ static void uart_max32_isr(const struct device *dev)
 }
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 
+#ifdef CONFIG_UART_ASYNC_API
+
+static int uart_max32_callback_set(const struct device *dev, uart_callback_t callback,
+				   void *user_data)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(callback);
+	ARG_UNUSED(user_data);
+	return 0;
+}
+
+static int uart_max32_tx(const struct device *dev, const uint8_t *buf, size_t len, int32_t timeout)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(buf);
+	ARG_UNUSED(len);
+	ARG_UNUSED(timeout);
+	return 0;
+}
+
+static int uart_max32_tx_abort(const struct device *dev)
+{
+	ARG_UNUSED(dev);
+	return 0;
+}
+
+static int uart_max32_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int32_t timeout)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(buf);
+	ARG_UNUSED(len);
+	ARG_UNUSED(timeout);
+	return 0;
+}
+
+static int uart_max32_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(buf);
+	ARG_UNUSED(len);
+	return 0;
+}
+
+static int uart_max32_rx_disable(const struct device *dev)
+{
+	ARG_UNUSED(dev);
+	return 0;
+}
+
+#endif
+
 static const struct uart_driver_api uart_max32_driver_api = {
 	.poll_in = uart_max32_poll_in,
 	.poll_out = uart_max32_poll_out,
@@ -379,6 +430,14 @@ static const struct uart_driver_api uart_max32_driver_api = {
 	.irq_update = uart_max32_irq_update,
 	.irq_callback_set = uart_max32_irq_callback_set,
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+#ifdef CONFIG_UART_ASYNC_API
+	.callback_set = uart_max32_callback_set,
+	.tx = uart_max32_tx,
+	.tx_abort = uart_max32_tx_abort,
+	.rx_enable = uart_max32_rx_enable,
+	.rx_buf_rsp = uart_max32_rx_buf_rsp,
+	.rx_disable = uart_max32_rx_disable,
+#endif /* CONFIG_UART_ASYNC_API */
 };
 
 #define MAX32_UART_INIT(_num)                                                                      \
