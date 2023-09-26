@@ -4,6 +4,7 @@
 if(CONFIG_BOARD_MAX32666FTHR2)
 board_runner_args(openocd --cmd-pre-init "source [find interface/cmsis-dap.cfg]")
 board_runner_args(openocd --cmd-pre-init "source [find target/max32665.cfg]")
+board_runner_args(openocd --cmd-pre-init "add_script_search_dir ${BOARD_DIR}/support/")
 endif()
 
 include(${ZEPHYR_BASE}/boards/common/openocd.board.cmake)
