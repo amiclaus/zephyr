@@ -16,7 +16,6 @@
 
 / {
 	chosen {
-		 zephyr,flash_controller = &flash_controller;
 		 zephyr,entropy = &trng;
 	};
 
@@ -89,20 +88,35 @@
 			sysclk-prescaler = <1>;
 		};
 
-		flash_controller: flash_controller@40029000 {
+		flc0: flash_controller@40029000 {
 			compatible = "adi,max32-flash-controller";
 			reg = <0x40029000 0x400>;
 
 			#address-cells = <1>;
 			#size-cells = <1>;
+			status = "okay";
 
 			flash0: flash@10000000 {
 				compatible = "adi,max32-flash", "soc-nv-flash";
-				reg = <0x10000000 0x80000>;
+				reg = <0x10000000 DT_SIZE_K(512)>;
 				write-block-size = <16>;
 				erase-block-size = <8192>;
-				/* maximum erase time for a 2K sector */
-				//max-erase-time = <40>;
+			};
+		};
+
+		flc1: flash_controller@40029400 {
+			compatible = "adi,max32-flash-controller";
+			reg = <0x40029400 0x400>;
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+			status = "okay";
+
+			flash1: flash@10080000 {
+				compatible = "adi,max32-flash", "soc-nv-flash";
+				reg = <0x10080000 DT_SIZE_K(512)>;
+				write-block-size = <16>;
+				erase-block-size = <8192>;
 			};
 		};
 

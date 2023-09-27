@@ -51,6 +51,24 @@
 	 };
 };
 
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		code_partition: partition@0 {
+			reg = <0x0 DT_SIZE_M(3)>;
+			read-only;
+		};
+
+		storage_partition: partition@300000 {
+			label = "storage";
+			reg = <0x300000 DT_SIZE_K(256)>;
+		};
+	};
+};
+
 &clk_ipo {
 	status = "okay";
 };

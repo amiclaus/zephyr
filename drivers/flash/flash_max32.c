@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT     adi_max32_flash_controller
-#define SOC_NV_FLASH_NODE DT_INST(0, soc_nv_flash)
+#define DT_DRV_COMPAT  adi_max32_flash_controller
+#define ADI_FLASH_NODE DT_INST(0, soc_nv_flash)
 
-#define FLASH_WRITE_BLK_SZ DT_PROP(SOC_NV_FLASH_NODE, write_block_size)
-#define FLASH_ERASE_BLK_SZ DT_PROP(SOC_NV_FLASH_NODE, erase_block_size)
+#define FLASH_WRITE_BLK_SZ DT_PROP(ADI_FLASH_NODE, write_block_size)
+#define FLASH_ERASE_BLK_SZ DT_PROP(ADI_FLASH_NODE, erase_block_size)
 
-#define FLASH_MAX32_BASE_ADDRESS 0x10000000
+#define FLASH_BASE DT_REG_ADDR(ADI_FLASH_NODE)
+#define FLASH_SIZE DT_REG_SIZE(ADI_FLASH_NODE)
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
@@ -19,91 +20,111 @@
 
 #include "flc.h"
 
-struct flash_max32_dev_data {
+#define FLASH_DATA(dev) ((struct max32_flash_dev_data *)((dev)->data))
+
+struct max32_flash_dev_data {
 	struct k_sem sem;
 };
 
-struct flash_max32_dev_config {
-	uint32_t base;
-	uint32_t size;
-};
+static int api_read(const struct device *dev, off_t address, void *buffer, size_t length)
+{
+	ARG_UNUSED(dev);
 
-static const struct flash_parameters flash_max32_parameters = {
-	.write_block_size = FLASH_WRITE_BLK_SZ,
-	.erase_value = 0xff,
-};
+	address += FLASH_BASE;
+	MXC_FLC_Read(address, buffer, length);
+	return 0;
+}
 
-static int flash_max32_read(const struct device *dev, off_t address, void *buffer, size_t length)
+static int api_write(const struct device *dev, off_t address, const void *buffer, size_t length)
 {
 	int ret = 0;
 
-	MXC_FLC_Read(address + FLASH_MAX32_BASE_ADDRESS, buffer, length);
+	k_sem_take(&FLASH_DATA(dev)->sem, K_FOREVER);
+
+	address += FLASH_BASE;
+	ret = MXC_FLC_Write(address, length, (uint32_t *)buffer);
+
+	k_sem_give(&FLASH_DATA(dev)->sem);
 
 	return ret;
 }
 
-static int flash_max32_write(const struct device *dev, off_t address, const void *buffer,
-			     size_t length)
+static int api_erase(const struct device *dev, off_t start, size_t len)
 {
 	int ret = 0;
+	uint32_t page_size = FLASH_ERASE_BLK_SZ;
+	uint32_t addr = (start + FLASH_BASE);
 
-	ret = MXC_FLC_Write(address + FLASH_MAX32_BASE_ADDRESS, length, buffer);
+	k_sem_take(&FLASH_DATA(dev)->sem, K_FOREVER);
 
-	return ret;
-}
+	while (len) {
+		ret = MXC_FLC_PageErase(addr);
+		if (ret) {
+			break;
+		}
 
-static int flash_max32_erase(const struct device *dev, off_t start, size_t len)
-{
-	int ret = 0;
+		addr += page_size;
+		if (len > page_size) {
+			len -= page_size;
+		} else {
+			len = 0;
+		}
+	}
 
-	ret = MXC_FLC_PageErase(start + FLASH_MAX32_BASE_ADDRESS);
+	k_sem_give(&FLASH_DATA(dev)->sem);
 
 	return ret;
 }
 
 #if CONFIG_FLASH_PAGE_LAYOUT
 static const struct flash_pages_layout flash_max32_pages_layout = {
-	.pages_count = DT_REG_SIZE(SOC_NV_FLASH_NODE) / FLASH_ERASE_BLK_SZ,
-	.pages_size = DT_PROP(SOC_NV_FLASH_NODE, erase_block_size),
+	.pages_count = FLASH_SIZE / FLASH_ERASE_BLK_SZ,
+	.pages_size = FLASH_ERASE_BLK_SZ,
 };
 
-void flash_max32_page_layout(const struct device *dev, const struct flash_pages_layout **layout,
-			     size_t *layout_size)
+static void api_page_layout(const struct device *dev, const struct flash_pages_layout **layout,
+			    size_t *layout_size)
 {
 	*layout = &flash_max32_pages_layout;
 	*layout_size = 1;
 }
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
-static const struct flash_parameters *flash_max32_get_parameters(const struct device *dev)
+static const struct flash_parameters *api_get_parameters(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	return &flash_max32_parameters;
+	static const struct flash_parameters parameters = {
+		.write_block_size = FLASH_WRITE_BLK_SZ,
+		.erase_value = 0xff,
+	};
+
+	return &parameters;
 }
 
 static int flash_max32_init(const struct device *dev)
 {
-	struct flash_max32_dev_data *const dev_data = dev->data;
+	int ret;
 
-	return MXC_FLC_Init();
+	ret = MXC_FLC_Init();
+
+	/* Mutex for flash controller */
+	k_sem_init(&FLASH_DATA(dev)->sem, 1, 1);
+
+	return ret;
 }
 
 static const struct flash_driver_api flash_max32_driver_api = {
-	.read = flash_max32_read,
-	.write = flash_max32_write,
-	.erase = flash_max32_erase,
-	.get_parameters = flash_max32_get_parameters,
+	.read = api_read,
+	.write = api_write,
+	.erase = api_erase,
+	.get_parameters = api_get_parameters,
 #ifdef CONFIG_FLASH_PAGE_LAYOUT
-	.page_layout = flash_max32_page_layout,
+	.page_layout = api_page_layout,
 #endif
 };
 
-static struct flash_max32_dev_data flash_max32_data;
+static struct max32_flash_dev_data flash_max32_data;
 
-static struct flash_max32_dev_config flash_max32_config = {
-	.base = DT_REG_ADDR(DT_INST(0, soc_nv_flash)),
-	.size = DT_REG_SIZE(DT_INST(0, soc_nv_flash))};
-
-DEVICE_DT_INST_DEFINE(0, flash_max32_init, NULL, &flash_max32_data, &flash_max32_config,
-		      POST_KERNEL, CONFIG_FLASH_INIT_PRIORITY, &flash_max32_driver_api);
+DEVICE_DT_INST_DEFINE(0, flash_max32_init, NULL, &flash_max32_data, NULL, POST_KERNEL,
+		      CONFIG_FLASH_INIT_PRIORITY, &flash_max32_driver_api);

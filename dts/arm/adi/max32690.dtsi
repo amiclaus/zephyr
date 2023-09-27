@@ -75,17 +75,36 @@
 				reg = <0x20000000 DT_SIZE_M(1)>;
 		};
 
-		flash: flash-controller@40029000 {
-				compatible = "st,stm32-flash-controller";
-				reg = <0x40029000 0x400>;
+		flc0: flash_controller@40029000 {
+			compatible = "adi,max32-flash-controller";
+			reg = <0x40029000 0x400>;
 
-				#address-cells = <1>;
-				#size-cells = <1>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			status = "okay";
 
-				flash0: flash@10000000 {
-						compatible = "soc-nv-flash";
-						reg = <0x10000000 DT_SIZE_M(3)>;
-				};
+			flash0: flash@10000000 {
+				compatible = "adi,max32-flash", "soc-nv-flash";
+				reg = <0x10000000 DT_SIZE_M(3)>;
+				write-block-size = <16>;
+				erase-block-size = <8192>;
+			};
+		};
+
+		flc1: flash_controller@40029400 {
+			compatible = "adi,max32-flash-controller";
+			reg = <0x40029400 0x400>;
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+			status = "okay";
+
+			flash1: flash@10080000 {
+				compatible = "adi,max32-flash", "soc-nv-flash";
+				reg = <0x10080000 DT_SIZE_K(256)>;
+				write-block-size = <16>;
+				erase-block-size = <8192>;
+			};
 		};
 
 		gcr: clock-controller@40000000 {
