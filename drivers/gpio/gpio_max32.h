@@ -9,6 +9,6 @@
 
 #include <zephyr/device.h>
 
-int gpio_max32_config_pinmux(const struct device *dev, int pin, int pinmux, int pincfg);
+int gpio_max32_config_pinmux(const struct device *dev, int pin, int afx, int pincfg);
 
 #endif

@@ -34,38 +34,38 @@ struct max32_gpio_data {
 	sys_slist_t cb_list;
 };
 
-static int gpio_max32_port_get_raw(const struct device *dev, uint32_t *value)
+static int api_port_get_raw(const struct device *dev, uint32_t *value)
 {
 	*value = MXC_GPIO_InGet(GPIO_CFG(dev)->regs, (unsigned int)-1);
 	return 0;
 }
 
-static int gpio_max32_port_set_masked_raw(const struct device *dev, gpio_port_pins_t mask,
-					  gpio_port_value_t value)
+static int api_port_set_masked_raw(const struct device *dev, gpio_port_pins_t mask,
+				   gpio_port_value_t value)
 {
 	MXC_GPIO_OutPut(GPIO_CFG(dev)->regs, mask, value);
 	return 0;
 }
 
-static int gpio_max32_port_set_bits_raw(const struct device *dev, gpio_port_pins_t pins)
+static int api_port_set_bits_raw(const struct device *dev, gpio_port_pins_t pins)
 {
 	MXC_GPIO_OutSet(GPIO_CFG(dev)->regs, pins);
 	return 0;
 }
 
-static int gpio_max32_port_clear_bits_raw(const struct device *dev, gpio_port_pins_t pins)
+static int api_port_clear_bits_raw(const struct device *dev, gpio_port_pins_t pins)
 {
 	MXC_GPIO_OutClr(GPIO_CFG(dev)->regs, pins);
 	return 0;
 }
 
-static int gpio_max32_port_toggle_bits(const struct device *dev, gpio_port_pins_t pins)
+static int api_port_toggle_bits(const struct device *dev, gpio_port_pins_t pins)
 {
 	MXC_GPIO_OutToggle(GPIO_CFG(dev)->regs, pins);
 	return 0;
 }
 
-int gpio_max32_config_pinmux(const struct device *dev, int pin, int pinmux, int pincfg)
+int gpio_max32_config_pinmux(const struct device *dev, int pin, int afx, int pincfg)
 {
 	mxc_gpio_cfg_t gpio_cfg;
 
@@ -84,7 +84,7 @@ int gpio_max32_config_pinmux(const struct device *dev, int pin, int pinmux, int 
 		gpio_cfg.func = MXC_GPIO_FUNC_OUT;
 	} else {
 		/* Add +1 to index match */
-		gpio_cfg.func = (mxc_gpio_func_t)(MAX32_PINMUX_MODE(pinmux) + 1);
+		gpio_cfg.func = (mxc_gpio_func_t)(afx + 1);
 	}
 
 	if (pincfg & BIT(MAX32_POWER_SOURCE_SHIFT)) {
@@ -98,7 +98,7 @@ int gpio_max32_config_pinmux(const struct device *dev, int pin, int pinmux, int 
 	return 0;
 }
 
-static int gpio_max32_config(const struct device *dev, gpio_pin_t pin, gpio_flags_t flags)
+static int api_pin_configure(const struct device *dev, gpio_pin_t pin, gpio_flags_t flags)
 {
 	mxc_gpio_regs_t *gpio = GPIO_CFG(dev)->regs;
 	mxc_gpio_cfg_t gpio_cfg;
@@ -139,8 +139,8 @@ static int gpio_max32_config(const struct device *dev, gpio_pin_t pin, gpio_flag
 	return 0;
 }
 
-static int gpio_max32_pin_interrupt_configure(const struct device *dev, gpio_pin_t pin,
-					      enum gpio_int_mode mode, enum gpio_int_trig trig)
+static int api_pin_interrupt_configure(const struct device *dev, gpio_pin_t pin,
+				       enum gpio_int_mode mode, enum gpio_int_trig trig)
 {
 	mxc_gpio_regs_t *gpio = GPIO_CFG(dev)->regs;
 	mxc_gpio_cfg_t gpio_cfg;
@@ -186,21 +186,20 @@ static int gpio_max32_pin_interrupt_configure(const struct device *dev, gpio_pin
 	return 0;
 }
 
-static int gpio_max32_manage_callback(const struct device *dev, struct gpio_callback *callback,
-				      bool set)
+static int api_manage_callback(const struct device *dev, struct gpio_callback *callback, bool set)
 {
 	return gpio_manage_callback(&(GPIO_DATA(dev)->cb_list), callback, set);
 }
 
 static const struct gpio_driver_api gpio_max32_driver = {
-	.pin_configure = gpio_max32_config,
-	.port_get_raw = gpio_max32_port_get_raw,
-	.port_set_masked_raw = gpio_max32_port_set_masked_raw,
-	.port_set_bits_raw = gpio_max32_port_set_bits_raw,
-	.port_clear_bits_raw = gpio_max32_port_clear_bits_raw,
-	.port_toggle_bits = gpio_max32_port_toggle_bits,
-	.pin_interrupt_configure = gpio_max32_pin_interrupt_configure,
-	.manage_callback = gpio_max32_manage_callback,
+	.pin_configure = api_pin_configure,
+	.port_get_raw = api_port_get_raw,
+	.port_set_masked_raw = api_port_set_masked_raw,
+	.port_set_bits_raw = api_port_set_bits_raw,
+	.port_clear_bits_raw = api_port_clear_bits_raw,
+	.port_toggle_bits = api_port_toggle_bits,
+	.pin_interrupt_configure = api_pin_interrupt_configure,
+	.manage_callback = api_manage_callback,
 };
 
 static void gpio_max32_isr(const void *param)
@@ -236,26 +235,27 @@ static int gpio_max32_init(const struct device *dev)
 	return 0;
 }
 
-#define MAX32_GPIO_INIT(n)                                                                         \
-	static void gpio_max32_irq_init_##n(void)                                                  \
+#define MAX32_GPIO_INIT(_num)                                                                      \
+	static void gpio_max32_irq_init_##_num(void)                                               \
 	{                                                                                          \
-		IRQ_CONNECT(DT_INST_IRQN(n), DT_INST_IRQ(n, priority), gpio_max32_isr,             \
-			    DEVICE_DT_INST_GET(n), 0);                                             \
-		irq_enable(DT_INST_IRQN(n));                                                       \
+		IRQ_CONNECT(DT_INST_IRQN(_num), DT_INST_IRQ(_num, priority), gpio_max32_isr,       \
+			    DEVICE_DT_INST_GET(_num), 0);                                          \
+		irq_enable(DT_INST_IRQN(_num));                                                    \
 	}                                                                                          \
-	static struct max32_gpio_data max32_gpio_data_##n;                                         \
-	static const struct max32_gpio_config max32_gpio_config_##n = {                            \
-		.common = {																			\
-			.port_pin_mask = GPIO_PORT_PIN_MASK_FROM_DT_INST(n),							\
-		},																					\
-		.regs = (mxc_gpio_regs_t *)DT_INST_REG_ADDR(n),                                    \
-		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(n)),                                    \
-		.perclk.bus = DT_INST_CLOCKS_CELL(n, offset),                                      \
-		.perclk.bit = DT_INST_CLOCKS_CELL(n, bit),                                         \
-		.irq_func = &gpio_max32_irq_init_##n,                                              \
+	static struct max32_gpio_data max32_gpio_data_##_num;                                      \
+	static const struct max32_gpio_config max32_gpio_config_##_num = {                         \
+		.common =                                                                          \
+			{                                                                          \
+				.port_pin_mask = GPIO_PORT_PIN_MASK_FROM_DT_INST(_num),            \
+			},                                                                         \
+		.regs = (mxc_gpio_regs_t *)DT_INST_REG_ADDR(_num),                                 \
+		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(_num)),                                 \
+		.perclk.bus = DT_INST_CLOCKS_CELL(_num, offset),                                   \
+		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
+		.irq_func = &gpio_max32_irq_init_##_num,                                           \
 	};                                                                                         \
-	DEVICE_DT_INST_DEFINE(n, gpio_max32_init, NULL, &max32_gpio_data_##n,                      \
-			      &max32_gpio_config_##n, PRE_KERNEL_1, CONFIG_GPIO_INIT_PRIORITY,     \
+	DEVICE_DT_INST_DEFINE(_num, gpio_max32_init, NULL, &max32_gpio_data_##_num,                \
+			      &max32_gpio_config_##_num, PRE_KERNEL_1, CONFIG_GPIO_INIT_PRIORITY,  \
 			      (void *)&gpio_max32_driver);
 
 DT_INST_FOREACH_STATUS_OKAY(MAX32_GPIO_INIT)

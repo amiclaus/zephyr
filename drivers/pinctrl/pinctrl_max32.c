@@ -20,12 +20,11 @@ static const struct device *gpios[] = {
 
 static int pinctrl_configure_pin(pinctrl_soc_pin_t soc_pin)
 {
-	uint32_t pinmux = soc_pin.pinmux;
-	uint32_t pincfg = soc_pin.pincfg;
-	uint32_t port = MAX32_PINMUX_PORT(pinmux);
-	uint32_t pin = MAX32_PINMUX_PIN(pinmux);
+	uint32_t port = MAX32_PINMUX_PORT(soc_pin.pinmux);
+	uint32_t pin = MAX32_PINMUX_PIN(soc_pin.pinmux);
+	uint32_t afx = MAX32_PINMUX_MODE(soc_pin.pinmux);
 
-	return gpio_max32_config_pinmux(gpios[port], pin, pinmux, pincfg);
+	return gpio_max32_config_pinmux(gpios[port], pin, afx, soc_pin.pincfg);
 }
 
 int pinctrl_configure_pins(const pinctrl_soc_pin_t *pins, uint8_t pin_cnt, uintptr_t reg)
