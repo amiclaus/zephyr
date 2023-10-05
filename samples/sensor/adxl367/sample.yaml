@@ -1,0 +1,8 @@
+sample:
+  name: ADXL367 Sensor Sample
+tests:
+  sample.sensor.adxl367:
+    harness: sensor
+    tags: sensors
+    platform_allow: nucleo_f413zh
+    depends_on: spi

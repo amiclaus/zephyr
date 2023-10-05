@@ -107,6 +107,13 @@
 	pinctrl-names = "default";
 	cs-gpios = <&gpiod 14 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
 	status = "okay";
+	adxl367:adxl367@0 {
+		compatible = "adi,adxl367";
+		reg = <0x0>;
+		spi-max-frequency = <20000000>;
+		int1-gpios = <&gpiof 12 GPIO_ACTIVE_HIGH>;
+		odr = <4>;
+	};
 };
 
 zephyr_udc0: &usbotg_fs {
