@@ -11,7 +11,7 @@
 
 #include <zephyr/dt-bindings/clock/adi_max32_clock.h>
 
-#include <mxc_sys.h>
+#include <wrap_max32_sys.h>
 
 /** Driver structure definition */
 
@@ -58,29 +58,6 @@ struct max32_perclk {
 #define ADI_MAX32_CLK_EXTCLK_FREQ    DT_PROP(DT_NODELABEL(clk_extclk), clock_frequency)
 #endif
 
-/*
- *  Map the clock macros depend on the device
- */
-#if defined(CONFIG_SOC_MAX32665) || defined(CONFIG_SOC_MAX32666)
-
-#define ADI_MAX32_CLK_IPO   MXC_SYS_CLOCK_HIRC96
-#define ADI_MAX32_CLK_ERFO  MXC_SYS_CLOCK_XTAL32M
-#define ADI_MAX32_CLK_IBRO  MXC_SYS_CLOCK_HIRC8
-#define ADI_MAX32_CLK_ISO   MXC_SYS_CLOCK_HIRC
-#define ADI_MAX32_CLK_INRO  MXC_SYS_CLOCK_LIRC8K
-#define ADI_MAX32_CLK_ERTCO MXC_SYS_CLOCK_XTAL32K
-
-#elif defined(CONFIG_SOC_MAX32690) || (CONFIG_SOC_MAX32655)
-
-#define ADI_MAX32_CLK_IPO    MXC_SYS_CLOCK_IPO
-#define ADI_MAX32_CLK_ERFO   MXC_SYS_CLOCK_ERFO
-#define ADI_MAX32_CLK_IBRO   MXC_SYS_CLOCK_IBRO
-#define ADI_MAX32_CLK_ISO    MXC_SYS_CLOCK_ISO
-#define ADI_MAX32_CLK_INRO   MXC_SYS_CLOCK_INRO
-#define ADI_MAX32_CLK_ERTCO  MXC_SYS_CLOCK_ERTCO
-#define ADI_MAX32_CLK_EXTCLK MXC_SYS_CLOCK_EXTCLK
-
-#endif
 
 #define DT_GCR_CLOCKS_CTRL DT_CLOCKS_CTLR(DT_NODELABEL(gcr))
 
