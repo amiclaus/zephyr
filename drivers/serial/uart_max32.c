@@ -17,7 +17,10 @@
 
 LOG_MODULE_REGISTER(uart_max32, CONFIG_UART_LOG_LEVEL);
 
-struct uart_max32_config {
+#define UART_CFG(dev)  ((struct max32_uart_config *)((dev)->config))
+#define UART_DATA(dev) ((struct max32_uart_data *)((dev)->data))
+
+struct max32_uart_config {
 	mxc_uart_regs_t *regs;
 	int clock_source;
 	const struct pinctrl_dev_config *pctrl;
@@ -29,7 +32,7 @@ struct uart_max32_config {
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 };
 
-struct uart_max32_data {
+struct max32_uart_data {
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 	uart_irq_callback_user_data_t cb; /* Interrupt Callback */
 	void *cb_data;                    /* Interrupt Callback Arg */
@@ -37,21 +40,16 @@ struct uart_max32_data {
 	struct uart_config conf; /* baudrate, stopbits, ... */
 };
 
-static void uart_max32_poll_out(const struct device *dev, unsigned char c)
+static void api_poll_out(const struct device *dev, unsigned char c)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-	mxc_uart_regs_t *regs = cfg->regs;
-
-	MXC_UART_WriteCharacter(regs, c);
+	MXC_UART_WriteCharacter(UART_CFG(dev)->regs, c);
 }
 
-static int uart_max32_poll_in(const struct device *dev, unsigned char *c)
+static int api_poll_in(const struct device *dev, unsigned char *c)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-	mxc_uart_regs_t *regs = cfg->regs;
 	int val;
 
-	val = MXC_UART_ReadCharacterRaw(regs);
+	val = MXC_UART_ReadCharacterRaw(UART_CFG(dev)->regs);
 	if (val >= 0) {
 		*c = (unsigned char)val;
 	} else {
@@ -61,14 +59,12 @@ static int uart_max32_poll_in(const struct device *dev, unsigned char *c)
 	return 0;
 }
 
-static int uart_max32_err_check(const struct device *dev)
+static int api_err_check(const struct device *dev)
 {
 	int err = 0;
-	const struct uart_max32_config *const cfg = dev->config;
-	mxc_uart_regs_t *regs = cfg->regs;
 	uint32_t flags;
 
-	flags = MXC_UART_GetFlags(regs);
+	flags = MXC_UART_GetFlags(UART_CFG(dev)->regs);
 
 	if (flags & ADI_MAX32_UART_ERROR_FRAMING) {
 		err |= UART_ERROR_FRAMING;
@@ -89,12 +85,12 @@ static int uart_max32_err_check(const struct device *dev)
 
 #define CONVERT_TO_MXC_DATABITS(x) (x + 5)
 
-static int uart_max32_configure(const struct device *dev, const struct uart_config *uart_cfg)
+static int api_configure(const struct device *dev, const struct uart_config *uart_cfg)
 {
 	int err;
-	const struct uart_max32_config *const cfg = dev->config;
+	const struct max32_uart_config *const cfg = dev->config;
 	mxc_uart_regs_t *regs = cfg->regs;
-	struct uart_max32_data *uart_priv_data = (struct uart_max32_data *)(dev->data);
+	struct max32_uart_data *uart_priv_data = (struct max32_uart_data *)(dev->data);
 
 	/*
 	 *  Set parity
@@ -175,9 +171,9 @@ static int uart_max32_configure(const struct device *dev, const struct uart_conf
 	return 0;
 }
 
-static int uart_max32_config_get(const struct device *dev, struct uart_config *uart_cfg)
+static int api_config_get(const struct device *dev, struct uart_config *uart_cfg)
 {
-	struct uart_max32_data *uart_priv_data = (struct uart_max32_data *)(dev->data);
+	struct max32_uart_data *uart_priv_data = (struct max32_uart_data *)(dev->data);
 
 	/* copy configs from global setting */
 	*uart_cfg = uart_priv_data->conf;
@@ -190,9 +186,9 @@ static int uart_max32_config_get(const struct device *dev, struct uart_config *u
 static int uart_max32_init(const struct device *dev)
 {
 	int ret;
-	const struct uart_max32_config *const cfg = dev->config;
+	const struct max32_uart_config *const cfg = dev->config;
 	mxc_uart_regs_t *regs = cfg->regs;
-	struct uart_max32_data *uart_priv_data = (struct uart_max32_data *)(dev->data);
+	struct max32_uart_data *uart_priv_data = (struct max32_uart_data *)(dev->data);
 
 	if (!device_is_ready(cfg->clock)) {
 		LOG_ERR("clock control device not ready");
@@ -234,105 +230,87 @@ static int uart_max32_init(const struct device *dev)
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 
-static int uart_max32_fifo_fill(const struct device *dev, const uint8_t *tx_data, int size)
+static int api_fifo_fill(const struct device *dev, const uint8_t *tx_data, int size)
 {
-	const struct uart_max32_config *const cfg = dev->config;
 	unsigned int num_tx = 0;
 
-	num_tx = MXC_UART_WriteTXFIFO(cfg->regs, (unsigned char *)tx_data, size);
+	num_tx = MXC_UART_WriteTXFIFO(UART_CFG(dev)->regs, (unsigned char *)tx_data, size);
 
 	return (int)num_tx;
 }
 
-static int uart_max32_fifo_read(const struct device *dev, uint8_t *rx_data, const int size)
+static int api_fifo_read(const struct device *dev, uint8_t *rx_data, const int size)
 {
-	const struct uart_max32_config *const cfg = dev->config;
 	unsigned int num_rx = 0;
 
-	num_rx = MXC_UART_ReadRXFIFO(cfg->regs, (unsigned char *)rx_data, size);
+	num_rx = MXC_UART_ReadRXFIFO(UART_CFG(dev)->regs, (unsigned char *)rx_data, size);
 
 	return num_rx;
 }
 
-static void uart_max32_irq_tx_enable(const struct device *dev)
+static void api_irq_tx_enable(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_INT_TX);
+	MXC_UART_EnableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_TX);
 }
 
-static void uart_max32_irq_tx_disable(const struct device *dev)
+static void api_irq_tx_disable(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_INT_TX);
+	MXC_UART_DisableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_TX);
 }
 
-static int uart_max32_irq_tx_ready(const struct device *dev)
+static int api_irq_tx_ready(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	return (MXC_UART_GetFlags(cfg->regs) & ADI_MAX32_UART_INT_TX);
+	return (MXC_UART_GetFlags(UART_CFG(dev)->regs) & ADI_MAX32_UART_INT_TX);
 }
 
-static void uart_max32_irq_rx_enable(const struct device *dev)
+static void api_irq_rx_enable(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
+	MXC_UART_EnableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_RX);
 }
 
-static void uart_max32_irq_rx_disable(const struct device *dev)
+static void api_irq_rx_disable(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
+	MXC_UART_DisableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_RX);
 }
 
-static int uart_max32_irq_tx_complete(const struct device *dev)
+static int api_irq_tx_complete(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	if (MXC_UART_GetActive(cfg->regs) == E_BUSY) {
+	if (MXC_UART_GetActive(UART_CFG(dev)->regs) == E_BUSY) {
 		return 0;
 	} else {
 		return 1; /* tranmission completed */
 	}
 }
 
-static int uart_max32_irq_rx_ready(const struct device *dev)
+static int api_irq_rx_ready(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	return (MXC_UART_GetFlags(cfg->regs) & ADI_MAX32_UART_INT_RX);
+	return (MXC_UART_GetFlags(UART_CFG(dev)->regs) & ADI_MAX32_UART_INT_RX);
 }
 
-static void uart_max32_irq_err_enable(const struct device *dev)
+static void api_irq_err_enable(const struct device *dev)
 {
 	/* ... */
 }
 
-static void uart_max32_irq_err_disable(const struct device *dev)
+static void api_irq_err_disable(const struct device *dev)
 {
 	/* ... */
 }
 
-static int uart_max32_irq_is_pending(const struct device *dev)
+static int api_irq_is_pending(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-
-	return (MXC_UART_GetFlags(cfg->regs) & (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
+	return (MXC_UART_GetFlags(UART_CFG(dev)->regs) & (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
 }
 
-static int uart_max32_irq_update(const struct device *dev)
+static int api_irq_update(const struct device *dev)
 {
 	return 1;
 }
 
-static void uart_max32_irq_callback_set(const struct device *dev, uart_irq_callback_user_data_t cb,
+static void api_irq_callback_set(const struct device *dev, uart_irq_callback_user_data_t cb,
 					void *cb_data)
 {
-	struct uart_max32_data *const dev_data = (struct uart_max32_data *)(dev->data);
+	struct max32_uart_data *const dev_data = (struct max32_uart_data *)(dev->data);
 
 	dev_data->cb = cb;
 	dev_data->cb_data = cb_data;
@@ -340,8 +318,8 @@ static void uart_max32_irq_callback_set(const struct device *dev, uart_irq_callb
 
 static void uart_max32_isr(const struct device *dev)
 {
-	const struct uart_max32_config *const cfg = dev->config;
-	struct uart_max32_data *dev_data = (struct uart_max32_data *)(dev->data);
+	const struct max32_uart_config *const cfg = dev->config;
+	struct max32_uart_data *dev_data = (struct max32_uart_data *)(dev->data);
 	unsigned int int_status;
 
 	int_status = MXC_UART_GetFlags(cfg->regs);
@@ -357,7 +335,7 @@ static void uart_max32_isr(const struct device *dev)
 
 #ifdef CONFIG_UART_ASYNC_API
 
-static int uart_max32_callback_set(const struct device *dev, uart_callback_t callback,
+static int api_callback_set(const struct device *dev, uart_callback_t callback,
 				   void *user_data)
 {
 	ARG_UNUSED(dev);
@@ -366,7 +344,7 @@ static int uart_max32_callback_set(const struct device *dev, uart_callback_t cal
 	return 0;
 }
 
-static int uart_max32_tx(const struct device *dev, const uint8_t *buf, size_t len, int32_t timeout)
+static int api_tx(const struct device *dev, const uint8_t *buf, size_t len, int32_t timeout)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(buf);
@@ -375,13 +353,13 @@ static int uart_max32_tx(const struct device *dev, const uint8_t *buf, size_t le
 	return 0;
 }
 
-static int uart_max32_tx_abort(const struct device *dev)
+static int api_tx_abort(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 	return 0;
 }
 
-static int uart_max32_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int32_t timeout)
+static int api_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int32_t timeout)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(buf);
@@ -390,7 +368,7 @@ static int uart_max32_rx_enable(const struct device *dev, uint8_t *buf, size_t l
 	return 0;
 }
 
-static int uart_max32_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
+static int api_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(buf);
@@ -398,7 +376,7 @@ static int uart_max32_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t 
 	return 0;
 }
 
-static int uart_max32_rx_disable(const struct device *dev)
+static int api_rx_disable(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 	return 0;
@@ -407,36 +385,36 @@ static int uart_max32_rx_disable(const struct device *dev)
 #endif
 
 static const struct uart_driver_api uart_max32_driver_api = {
-	.poll_in = uart_max32_poll_in,
-	.poll_out = uart_max32_poll_out,
-	.err_check = uart_max32_err_check,
+	.poll_in = api_poll_in,
+	.poll_out = api_poll_out,
+	.err_check = api_err_check,
 #ifdef CONFIG_UART_USE_RUNTIME_CONFIGURE
-	.configure = uart_max32_configure,
-	.config_get = uart_max32_config_get,
+	.configure = api_configure,
+	.config_get = api_config_get,
 #endif /* CONFIG_UART_USE_RUNTIME_CONFIGURE */
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	.fifo_fill = uart_max32_fifo_fill,
-	.fifo_read = uart_max32_fifo_read,
-	.irq_tx_enable = uart_max32_irq_tx_enable,
-	.irq_tx_disable = uart_max32_irq_tx_disable,
-	.irq_tx_ready = uart_max32_irq_tx_ready,
-	.irq_rx_enable = uart_max32_irq_rx_enable,
-	.irq_rx_disable = uart_max32_irq_rx_disable,
-	.irq_tx_complete = uart_max32_irq_tx_complete,
-	.irq_rx_ready = uart_max32_irq_rx_ready,
-	.irq_err_enable = uart_max32_irq_err_enable,
-	.irq_err_disable = uart_max32_irq_err_disable,
-	.irq_is_pending = uart_max32_irq_is_pending,
-	.irq_update = uart_max32_irq_update,
-	.irq_callback_set = uart_max32_irq_callback_set,
+	.fifo_fill = api_fifo_fill,
+	.fifo_read = api_fifo_read,
+	.irq_tx_enable = api_irq_tx_enable,
+	.irq_tx_disable = api_irq_tx_disable,
+	.irq_tx_ready = api_irq_tx_ready,
+	.irq_rx_enable = api_irq_rx_enable,
+	.irq_rx_disable = api_irq_rx_disable,
+	.irq_tx_complete = api_irq_tx_complete,
+	.irq_rx_ready = api_irq_rx_ready,
+	.irq_err_enable = api_irq_err_enable,
+	.irq_err_disable = api_irq_err_disable,
+	.irq_is_pending = api_irq_is_pending,
+	.irq_update = api_irq_update,
+	.irq_callback_set = api_irq_callback_set,
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 #ifdef CONFIG_UART_ASYNC_API
-	.callback_set = uart_max32_callback_set,
-	.tx = uart_max32_tx,
-	.tx_abort = uart_max32_tx_abort,
-	.rx_enable = uart_max32_rx_enable,
-	.rx_buf_rsp = uart_max32_rx_buf_rsp,
-	.rx_disable = uart_max32_rx_disable,
+	.callback_set = api_callback_set,
+	.tx = api_tx,
+	.tx_abort = api_tx_abort,
+	.rx_enable = api_rx_enable,
+	.rx_buf_rsp = api_rx_buf_rsp,
+	.rx_disable = api_rx_disable,
 #endif /* CONFIG_UART_ASYNC_API */
 };
 
@@ -450,7 +428,7 @@ static const struct uart_driver_api uart_max32_driver_api = {
 						uart_max32_isr, DEVICE_DT_INST_GET(_num), 0);      \
 				    irq_enable(DT_INST_IRQN(_num))));                              \
 		   }));                                                                            \
-	static const struct uart_max32_config uart_max32_config_##_num = {                         \
+	static const struct max32_uart_config max32_uart_config_##_num = {                         \
 		.regs = (mxc_uart_regs_t *)DT_INST_REG_ADDR(_num),                                 \
 		.pctrl = PINCTRL_DT_INST_DEV_CONFIG_GET(_num),                                     \
 		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(_num)),                                 \
@@ -462,10 +440,10 @@ static const struct uart_driver_api uart_max32_driver_api = {
 		.uart_conf.data_bits = DT_INST_ENUM_IDX(_num, data_bits),                          \
 		IF_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN,                                           \
 			   (.irq_config_func = uart_max32_irq_init_##_num, ))};                    \
-	static struct uart_max32_data uart_max32_data##_num = {                                    \
+	static struct max32_uart_data max32_uart_data##_num = {                                    \
 		IF_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN, (.cb = NULL, ))};                         \
-	DEVICE_DT_INST_DEFINE(_num, uart_max32_init, NULL, &uart_max32_data##_num,                 \
-			      &uart_max32_config_##_num, PRE_KERNEL_1,                             \
+	DEVICE_DT_INST_DEFINE(_num, uart_max32_init, NULL, &max32_uart_data##_num,                 \
+			      &max32_uart_config_##_num, PRE_KERNEL_1,                             \
 			      CONFIG_SERIAL_INIT_PRIORITY, (void *)&uart_max32_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(MAX32_UART_INIT)

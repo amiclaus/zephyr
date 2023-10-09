@@ -64,11 +64,7 @@ static mxc_dma_width_t dma_width_z_to_mxc(uint32_t width)
 	}
 }
 
-/*
- * APIs
- */
-
-static inline int max32_dma_config(const struct device *dev, uint32_t channel,
+static inline int api_config(const struct device *dev, uint32_t channel,
 				   struct dma_config *config)
 {
 	int ret = 0;
@@ -157,7 +153,7 @@ static inline int max32_dma_config(const struct device *dev, uint32_t channel,
 	return ret;
 }
 
-static inline int max32_dma_reload(const struct device *dev, uint32_t channel, uint32_t src,
+static inline int api_reload(const struct device *dev, uint32_t channel, uint32_t src,
 				   uint32_t dst, size_t size)
 {
 	mxc_dma_srcdst_t reload;
@@ -169,7 +165,7 @@ static inline int max32_dma_reload(const struct device *dev, uint32_t channel, u
 	return MXC_DMA_SetSrcReload(reload);
 }
 
-int max32_dma_start(const struct device *dev, uint32_t channel)
+static int api_start(const struct device *dev, uint32_t channel)
 {
 	const struct max32_dma_config *cfg = dev->config;
 
@@ -181,7 +177,7 @@ int max32_dma_start(const struct device *dev, uint32_t channel)
 	return MXC_DMA_Start(channel);
 }
 
-int max32_dma_stop(const struct device *dev, uint32_t channel)
+static int api_stop(const struct device *dev, uint32_t channel)
 {
 	const struct max32_dma_config *cfg = dev->config;
 
@@ -199,7 +195,7 @@ int max32_dma_stop(const struct device *dev, uint32_t channel)
 	return MXC_DMA_Stop(channel);
 }
 
-static inline int max32_dma_get_status(const struct device *dev, uint32_t channel,
+static inline int api_get_status(const struct device *dev, uint32_t channel,
 				       struct dma_status *stat)
 {
 	const struct max32_dma_config *cfg = dev->config;
@@ -297,11 +293,11 @@ static int max32_dma_init(const struct device *dev)
 }
 
 static const struct dma_driver_api max32_dma_driver_api = {
-	.config = max32_dma_config,
-	.reload = max32_dma_reload,
-	.start = max32_dma_start,
-	.stop = max32_dma_stop,
-	.get_status = max32_dma_get_status,
+	.config = api_config,
+	.reload = api_reload,
+	.start = api_start,
+	.stop = api_stop,
+	.get_status = api_get_status,
 };
 
 static const struct max32_dma_config dma_cfg = {
