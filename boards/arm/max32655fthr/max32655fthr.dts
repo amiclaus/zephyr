@@ -8,6 +8,7 @@
 
  #include <adi/max32655.dtsi>
  #include <adi/max32655-pinctrl.dtsi>
+ #include <zephyr/dt-bindings/gpio/adi-max32-gpio.h>
 
 / {
 	 model = "Analog Devices MAX32655FTHR";

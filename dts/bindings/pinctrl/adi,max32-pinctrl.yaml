@@ -28,10 +28,12 @@ child-binding:
         - bias-disable
         - bias-pull-down
         - bias-pull-up
-        - drive-push-pull
-        - drive-open-drain
         - output-low
         - output-high
+        - input-enable
+        - output-enable
+        - power-source
+        - drive-strength
 
   properties:
     pinmux:
@@ -71,3 +73,19 @@ child-binding:
           pinmux = <MAX32_PINMUX(0, 9, MAX32_GPIO)>;
           output-high;
         };
+    power-source:
+        enum: [0, 1]
+        description: |
+          GPIO Supply Voltage Select, Selects the voltage rail used for the pin.
+          0 or MAX32_VSEL_VDDIO
+          1 or MAX32_VSEL_VDDIOH
+    drive-strength:
+        default: 0
+        enum: [0, 1, 2, 3]
+        description: |
+          There are 4 drive strength mode.
+          Mode 0: 1mA
+          Mode 1: 2mA
+          Mode 2: 4mA
+          Mode 3: 8mA
+          For more information please take a look device datasheet

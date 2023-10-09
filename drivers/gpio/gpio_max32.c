@@ -10,6 +10,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/clock_control/adi_max32_clock_control.h>
+#include <zephyr/dt-bindings/gpio/adi-max32-gpio.h>
 
 #include <gpio.h>
 
@@ -75,6 +76,8 @@ int gpio_max32_config_pinmux(const struct device *dev, int pin, int afx, int pin
 	if (pincfg & BIT(MAX32_BIAS_PULL_UP_SHIFT)) {
 		gpio_cfg.pad = MXC_GPIO_PAD_PULL_UP;
 	} else if (pincfg & BIT(MAX32_BIAS_PULL_DOWN_SHIFT)) {
+		gpio_cfg.pad = MXC_GPIO_PAD_PULL_DOWN;
+	} else {
 		gpio_cfg.pad = MXC_GPIO_PAD_NONE;
 	}
 
@@ -93,7 +96,30 @@ int gpio_max32_config_pinmux(const struct device *dev, int pin, int afx, int pin
 		gpio_cfg.vssel = MXC_GPIO_VSSEL_VDDIO;
 	}
 
+	switch (pincfg & MAX32_GPIO_DRV_STRENGTH_MASK) {
+	case MAX32_GPIO_DRV_STRENGTH_1:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_1;
+		break;
+	case MAX32_GPIO_DRV_STRENGTH_2:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_2;
+		break;
+	case MAX32_GPIO_DRV_STRENGTH_3:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_3;
+		break;
+	default:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_0;
+		break;
+	}
+
 	MXC_GPIO_Config(&gpio_cfg);
+
+	if (pincfg & BIT(MAX32_OUTPUT_ENABLE_SHIFT)) {
+		if (pincfg & BIT(MAX32_OUTPUT_HIGH_SHIFT)) {
+			MXC_GPIO_OutSet(gpio_cfg.port, BIT(pin));
+		} else {
+			MXC_GPIO_OutClr(gpio_cfg.port, BIT(pin));
+		}
+	}
 
 	return 0;
 }
@@ -110,6 +136,10 @@ static int api_pin_configure(const struct device *dev, gpio_pin_t pin, gpio_flag
 		gpio_cfg.pad = MXC_GPIO_PAD_PULL_UP;
 	} else if (flags & GPIO_PULL_DOWN) {
 		gpio_cfg.pad = MXC_GPIO_PAD_PULL_DOWN;
+	} else if (flags & MAX32_GPIO_WEAK_PULL_UP) {
+		gpio_cfg.pad = MXC_GPIO_PAD_WEAK_PULL_UP;
+	} else if (flags & MAX32_GPIO_WEAK_PULL_DOWN) {
+		gpio_cfg.pad = MXC_GPIO_PAD_WEAK_PULL_DOWN;
 	} else {
 		gpio_cfg.pad = MXC_GPIO_PAD_NONE;
 	}
@@ -123,8 +153,26 @@ static int api_pin_configure(const struct device *dev, gpio_pin_t pin, gpio_flag
 		gpio_cfg.func = MXC_GPIO_FUNC_ALT1; /* TODO: Think on it */
 	}
 
-	/* TODO: Set it VDDIO/VDDIOH depend on the params */
-	gpio_cfg.vssel = MXC_GPIO_VSSEL_VDDIO;
+	if (flags & MAX32_GPIO_VSEL_VDDIOH) {
+		gpio_cfg.vssel = MXC_GPIO_VSSEL_VDDIOH;
+	} else {
+		gpio_cfg.vssel = MXC_GPIO_VSSEL_VDDIO;
+	}
+
+	switch (flags & MAX32_GPIO_DRV_STRENGTH_MASK) {
+	case MAX32_GPIO_DRV_STRENGTH_1:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_1;
+		break;
+	case MAX32_GPIO_DRV_STRENGTH_2:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_2;
+		break;
+	case MAX32_GPIO_DRV_STRENGTH_3:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_3;
+		break;
+	default:
+		gpio_cfg.drvstr = MXC_GPIO_DRVSTR_0;
+		break;
+	}
 
 	MXC_GPIO_Config(&gpio_cfg);
 

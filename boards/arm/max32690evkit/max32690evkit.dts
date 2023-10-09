@@ -8,6 +8,7 @@
 
 #include <adi/max32690.dtsi>
 #include <adi/max32690-pinctrl.dtsi>
+#include <zephyr/dt-bindings/gpio/adi-max32-gpio.h>
 
 / {
 	model = "Analog Devices MAX32690EVKIT";
