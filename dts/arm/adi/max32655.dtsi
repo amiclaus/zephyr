@@ -246,6 +246,8 @@
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
+				pinctrl-0 = <&tmr0a_ioa_p0_2>;
+				pinctrl-names = "default";
 				#pwm-cells = <3>;
 			};
 		};
@@ -259,6 +261,8 @@
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
+				pinctrl-0 = <&tmr1a_ioa_p0_14>;
+				pinctrl-names = "default";
 				#pwm-cells = <3>;
 			};
 		};
@@ -272,6 +276,8 @@
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
+				pinctrl-0 = <&tmr2a_ioa_p0_26>;
+				pinctrl-names = "default";
 				#pwm-cells = <3>;
 			};
 		};
@@ -285,6 +291,8 @@
 			pwm {
 				compatible = "adi,max32-pwm";
 				status = "disabled";
+				pinctrl-0 = <&tmr3a_ioa_p1_6>;
+				pinctrl-names = "default";
 				#pwm-cells = <3>;
 			};
 		};

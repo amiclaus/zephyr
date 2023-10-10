@@ -28,6 +28,7 @@ LOG_MODULE_REGISTER(pwm_max32, CONFIG_PWM_LOG_LEVEL);
 /** PWM configuration. */
 struct max32_pwm_config {
 	mxc_tmr_regs_t *regs;
+	const struct pinctrl_dev_config *pctrl;
 	const struct device *clock;
 	struct max32_perclk perclk;
 };
@@ -52,6 +53,7 @@ static int api_set_cycles(const struct device *dev, uint32_t channel, uint32_t p
 
 #if defined(CONFIG_SOC_MAX32690) || (CONFIG_SOC_MAX32655)
 	pwm_cfg.clock = MXC_TMR_APB_CLK;
+	pwm_cfg.bitMode = 0;
 #endif
 
 	MXC_TMR_Shutdown(regs);
@@ -77,7 +79,6 @@ static int api_set_cycles(const struct device *dev, uint32_t channel, uint32_t p
 static int api_get_cycles_per_sec(const struct device *dev, uint32_t channel, uint64_t *cycles)
 {
 	*cycles = (uint64_t)(PeripheralClock / (TMR_PRES_1 + 1));
-
 	return 0;
 }
 
@@ -90,14 +91,22 @@ static int pwm_max32_init(const struct device *dev)
 {
 	int ret = 0;
 
+	ret = pinctrl_apply_state(TMR_CFG(dev)->pctrl, PINCTRL_STATE_DEFAULT);
+	if (ret) {
+		LOG_ERR("PWM pinctrl initialization failed (%d)", ret);
+		return ret;
+	}
+
 	return ret;
 }
 
 #define PWM_MAX32_DEFINE(_num)                                                                     \
 	static struct max32_pwm_data max32_pwm_data_##_num;                                        \
                                                                                                    \
+	PINCTRL_DT_INST_DEFINE(_num);                                                              \
 	static const struct max32_pwm_config max32_pwm_config_##_num = {                           \
 		.regs = (mxc_tmr_regs_t *)DT_REG_ADDR(DT_INST_PARENT(_num)),                       \
+		.pctrl = PINCTRL_DT_INST_DEV_CONFIG_GET(_num),                                     \
 		.clock = DEVICE_DT_GET(DT_CLOCKS_CTLR(DT_INST_PARENT(_num))),                      \
 		.perclk.bus = DT_CLOCKS_CELL(DT_INST_PARENT(_num), offset),                        \
 		.perclk.bit = DT_CLOCKS_CELL(DT_INST_PARENT(_num), bit),                           \

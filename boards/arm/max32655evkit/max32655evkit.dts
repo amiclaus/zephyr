@@ -52,6 +52,7 @@
 		sw0 = &pb1;
 		sw1 = &pb2;
 		rtc = &rtc;
+		pwm-0 = &pwm0;
 	 };
 };
 
@@ -121,33 +122,6 @@
 	pwm0: pwm {
 		status = "okay";
 		pinctrl-0 = <&tmr0a_ioa_p0_2>;
-		pinctrl-names = "default";
-	};
-};
-
-&timer1 {
-	status = "okay";
-	pwm1: pwm {
-		status = "disabled";
-		pinctrl-0 = <&tmr1a_ioa_p0_14>;
-		pinctrl-names = "default";
-	};
-};
-
-&timer2 {
-	status = "okay";
-	pwm2: pwm {
-		status = "disabled";
-		pinctrl-0 = <&tmr2a_ioa_p0_26>;
-		pinctrl-names = "default";
-	};
-};
-
-&timer3 {
-	status = "okay";
-	pwm3: pwm {
-		status = "disabled";
-		pinctrl-0 = <&tmr3a_ioa_p1_6>;
 		pinctrl-names = "default";
 	};
 };
