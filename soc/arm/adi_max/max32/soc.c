@@ -12,7 +12,6 @@
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include <cmsis_core.h>
-#include <zephyr/arch/arm/aarch32/nmi.h>
 #include <zephyr/irq.h>
 #include <zephyr/linker/linker-defs.h>
 #include <string.h>
