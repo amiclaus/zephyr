@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(wdt_max32);
 
 struct max32_wdt_config {
 	mxc_wdt_regs_t *regs;
+	int clock_source;
 	const struct device *clock;
 	struct max32_perclk perclk;
 };
@@ -68,23 +69,20 @@ static int api_feed(const struct device *dev, int channel_id)
 	ARG_UNUSED(channel_id);
 
 	MXC_WDT_ResetTimer(WDT_CFG(dev)->regs);
-
 	return 0;
 }
 
 static int api_setup(const struct device *dev, uint8_t options)
 {
 	MXC_WDT_Enable(WDT_CFG(dev)->regs);
-
 	api_feed(dev, 0);
-
 	return 0;
 }
 
 static int api_install_timeout(const struct device *dev, const struct wdt_timeout_cfg *cfg)
 {
 	struct max32_wdt_data *data = dev->data;
-	wrap_mxc_wdt_cfg_t w_cfg;
+	wrap_mxc_wdt_cfg_t wdt_cfg;
 
 	if ((cfg->window.min != 0U) || (cfg->window.max == 0U)) {
 		return -EINVAL;
@@ -94,10 +92,10 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 	data->callback = cfg->callback;
 
 	int period = 31 - wdt_max32_calculate_timeout(data->timeout);
-	
-	w_cfg.upperResetPeriod = period;
 
-	Wrap_MXC_WDT_SetResetPeriod(WDT_CFG(dev)->regs, &w_cfg);
+	wdt_cfg.upperResetPeriod = period;
+
+	Wrap_MXC_WDT_SetResetPeriod(WDT_CFG(dev)->regs, &wdt_cfg);
 
 	return 0;
 }
@@ -105,23 +103,23 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 static int wdt_max32_init(const struct device *dev)
 {
 	int ret = 0;
-	mxc_wdt_regs_t *regs = WDT_CFG(dev)->regs;
-	const struct max32_wdt_config *const cfg = dev->config;
-
-	/* WDT Init */
-	Wrap_MXC_WDT_Init(regs, cfg);
+	wrap_mxc_wdt_cfg_t wdt_cfg;
 
 	/* enable clock */
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	ret = clock_control_on(WDT_CFG(dev)->clock,
+			       (clock_control_subsys_t) &(WDT_CFG(dev)->perclk));
 	if (ret) {
 		return ret;
 	}
 
-	/* WDT Enable RESET */
-	MXC_WDT_EnableReset(regs);
+	wdt_cfg.mode = 0; /* Todo set mode during usage*/
+	wdt_cfg.upperResetPeriod = 0; /* Not used during initialization */
+	wdt_cfg.lowerResetPeriod = 0; /* Not used during initialization */
+	wdt_cfg.upperIntPeriod = 0;   /* Not used during initialization */
+	wdt_cfg.lowerIntPeriod = 0;   /* Not used during initialization */
+	Wrap_MXC_WDT_Init(WDT_CFG(dev)->regs, &wdt_cfg);
 
-	/* WDT Enable */
-	MXC_WDT_Enable(regs);
+	MXC_WDT_EnableReset(WDT_CFG(dev)->regs);
 
 	return 0;
 }
@@ -136,6 +134,7 @@ static const struct wdt_driver_api max32_wdt_api = {.setup = api_setup,
 	static struct max32_wdt_config max32_wdt_config##_num = {                                  \
 		.regs = (mxc_wdt_regs_t *)DT_INST_REG_ADDR(_num),                                  \
 		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(_num)),                                 \
+		.clock_source = DT_INST_PROP(_num, clock_source),                                  \
 		.perclk.bus = DT_INST_CLOCKS_CELL(_num, offset),                                   \
 		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
 	};                                                                                         \

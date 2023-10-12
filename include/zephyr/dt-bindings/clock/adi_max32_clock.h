@@ -12,12 +12,12 @@
 #define ADI_MAX32_CLOCK_BUS1 1
 #define ADI_MAX32_CLOCK_BUS2 2
 
-/** Clock source for UART interface */
-#define ADI_MAX32_UART_CLK_PCLK   0
-#define ADI_MAX32_UART_CLK_EXTCLK 1
-#define ADI_MAX32_UART_CLK_IBRO   2
-#define ADI_MAX32_UART_CLK_ERFO   3
-#define ADI_MAX32_UART_CLK_ERTCO  4
-#define ADI_MAX32_UART_CLK_INRO   5
+/** Clock source for peripheral interfaces like UART, WDT... */
+#define ADI_MAX32_PRPH_CLK_SRC_PCLK   0
+#define ADI_MAX32_PRPH_CLK_SRC_EXTCLK 1
+#define ADI_MAX32_PRPH_CLK_SRC_IBRO   2
+#define ADI_MAX32_PRPH_CLK_SRC_ERFO   3
+#define ADI_MAX32_PRPH_CLK_SRC_ERTCO  4
+#define ADI_MAX32_PRPH_CLK_SRC_INRO   5
 
 #endif /* ZEPHYR_INCLUDE_DT_BINDINGS_CLOCK_ADI_MAX32_CLOCK_H_ */

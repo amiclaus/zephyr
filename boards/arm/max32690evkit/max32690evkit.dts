@@ -49,6 +49,7 @@
 		led1 = &green_led;
 		sw0 = &pb0;
 		rtc = &rtc;
+		watchdog0 = &wdt0;
 		pwm-0 = &pwm0;
 	 };
 };

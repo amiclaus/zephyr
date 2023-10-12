@@ -52,6 +52,7 @@
 		sw0 = &pb1;
 		sw1 = &pb2;
 		rtc = &rtc;
+		watchdog0 = &wdt0;
 		pwm-0 = &pwm0;
 	 };
 };
