@@ -307,12 +307,16 @@ static int api_irq_rx_ready(const struct device *dev)
 
 static void api_irq_err_enable(const struct device *dev)
 {
-	/* ... */
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_ERROR_INTERRUPTS);
 }
 
 static void api_irq_err_disable(const struct device *dev)
 {
-	/* ... */
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_ERROR_INTERRUPTS);
 }
 
 static int api_irq_is_pending(const struct device *dev)
