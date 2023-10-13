@@ -285,6 +285,16 @@
 			reg = <0x40003000 0x400>;
 			interrupts = <1 0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 27>;
+			clock-source = <0>;
+			status = "disabled";
+		};
+
+		wdt1: watchdog@40080800  {
+			compatible = "adi,max32-watchdog";
+			reg = <0x40080800 0x400>;
+			interrupts = <57 0>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS2 1>;
+			clock-source = <2>;
 			status = "disabled";
 		};
 
