@@ -59,7 +59,7 @@ static inline int max32_clock_control_off(const struct device *dev, clock_contro
 	return 0;
 }
 
-static struct clock_control_driver_api max32_clock_control_api = {
+static const struct clock_control_driver_api max32_clock_control_api = {
 	.on = max32_clock_control_on,
 	.off = max32_clock_control_off,
 };

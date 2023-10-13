@@ -18,8 +18,6 @@
 
 LOG_MODULE_REGISTER(gpio_max32, CONFIG_GPIO_LOG_LEVEL);
 
-#define GPIO_CFG(dev)  ((struct max32_gpio_config *)((dev)->config))
-#define GPIO_DATA(dev) ((struct max32_gpio_data *)((dev)->data))
 
 struct max32_gpio_config {
 	struct gpio_driver_config common;
@@ -37,40 +35,51 @@ struct max32_gpio_data {
 
 static int api_port_get_raw(const struct device *dev, uint32_t *value)
 {
-	*value = MXC_GPIO_InGet(GPIO_CFG(dev)->regs, (unsigned int)-1);
+	const struct max32_gpio_config *cfg = dev->config;
+
+	*value = MXC_GPIO_InGet(cfg->regs, (unsigned int)-1);
 	return 0;
 }
 
 static int api_port_set_masked_raw(const struct device *dev, gpio_port_pins_t mask,
 				   gpio_port_value_t value)
 {
-	MXC_GPIO_OutPut(GPIO_CFG(dev)->regs, mask, value);
+	const struct max32_gpio_config *cfg = dev->config;
+
+	MXC_GPIO_OutPut(cfg->regs, mask, value);
 	return 0;
 }
 
 static int api_port_set_bits_raw(const struct device *dev, gpio_port_pins_t pins)
 {
-	MXC_GPIO_OutSet(GPIO_CFG(dev)->regs, pins);
+	const struct max32_gpio_config *cfg = dev->config;
+
+	MXC_GPIO_OutSet(cfg->regs, pins);
 	return 0;
 }
 
 static int api_port_clear_bits_raw(const struct device *dev, gpio_port_pins_t pins)
 {
-	MXC_GPIO_OutClr(GPIO_CFG(dev)->regs, pins);
+	const struct max32_gpio_config *cfg = dev->config;
+
+	MXC_GPIO_OutClr(cfg->regs, pins);
 	return 0;
 }
 
 static int api_port_toggle_bits(const struct device *dev, gpio_port_pins_t pins)
 {
-	MXC_GPIO_OutToggle(GPIO_CFG(dev)->regs, pins);
+	const struct max32_gpio_config *cfg = dev->config;
+
+	MXC_GPIO_OutToggle(cfg->regs, pins);
 	return 0;
 }
 
 int gpio_max32_config_pinmux(const struct device *dev, int pin, int afx, int pincfg)
 {
+	const struct max32_gpio_config *cfg = dev->config;
 	mxc_gpio_cfg_t gpio_cfg;
 
-	gpio_cfg.port = GPIO_CFG(dev)->regs;
+	gpio_cfg.port = cfg->regs;
 	gpio_cfg.mask = BIT(pin);
 
 	if (pincfg & BIT(MAX32_BIAS_PULL_UP_SHIFT)) {
@@ -126,10 +135,10 @@ int gpio_max32_config_pinmux(const struct device *dev, int pin, int afx, int pin
 
 static int api_pin_configure(const struct device *dev, gpio_pin_t pin, gpio_flags_t flags)
 {
-	mxc_gpio_regs_t *gpio = GPIO_CFG(dev)->regs;
+	const struct max32_gpio_config *cfg = dev->config;
 	mxc_gpio_cfg_t gpio_cfg;
 
-	gpio_cfg.port = gpio;
+	gpio_cfg.port = cfg->regs;
 	gpio_cfg.mask = BIT(pin);
 
 	if (flags & GPIO_PULL_UP) {
@@ -178,9 +187,9 @@ static int api_pin_configure(const struct device *dev, gpio_pin_t pin, gpio_flag
 
 	if (flags & GPIO_OUTPUT) {
 		if (flags & GPIO_OUTPUT_INIT_LOW) {
-			MXC_GPIO_OutClr(gpio, BIT(pin));
+			MXC_GPIO_OutClr(cfg->regs, BIT(pin));
 		} else if (flags & GPIO_OUTPUT_INIT_HIGH) {
-			MXC_GPIO_OutSet(gpio, BIT(pin));
+			MXC_GPIO_OutSet(cfg->regs, BIT(pin));
 		}
 	}
 
@@ -190,15 +199,15 @@ static int api_pin_configure(const struct device *dev, gpio_pin_t pin, gpio_flag
 static int api_pin_interrupt_configure(const struct device *dev, gpio_pin_t pin,
 				       enum gpio_int_mode mode, enum gpio_int_trig trig)
 {
-	mxc_gpio_regs_t *gpio = GPIO_CFG(dev)->regs;
+	const struct max32_gpio_config *cfg = dev->config;
 	mxc_gpio_cfg_t gpio_cfg;
 
-	gpio_cfg.port = gpio;
+	gpio_cfg.port = cfg->regs;
 	gpio_cfg.mask = BIT(pin);
 	/* rest of the parameters not necessary */
 
 	if (mode == GPIO_INT_MODE_DISABLED) {
-		MXC_GPIO_DisableInt(gpio, gpio_cfg.mask);
+		MXC_GPIO_DisableInt(cfg->regs, gpio_cfg.mask);
 		return 0;
 	}
 
@@ -229,14 +238,16 @@ static int api_pin_interrupt_configure(const struct device *dev, gpio_pin_t pin,
 		return -EINVAL;
 	}
 
-	MXC_GPIO_EnableInt(gpio, gpio_cfg.mask);
+	MXC_GPIO_EnableInt(cfg->regs, gpio_cfg.mask);
 
 	return 0;
 }
 
 static int api_manage_callback(const struct device *dev, struct gpio_callback *callback, bool set)
 {
-	return gpio_manage_callback(&(GPIO_DATA(dev)->cb_list), callback, set);
+	struct max32_gpio_data *data = dev->data;
+
+	return gpio_manage_callback(&(data->cb_list), callback, set);
 }
 
 static const struct gpio_driver_api gpio_max32_driver = {
@@ -253,12 +264,14 @@ static const struct gpio_driver_api gpio_max32_driver = {
 static void gpio_max32_isr(const void *param)
 {
 	const struct device *dev = param;
+	const struct max32_gpio_config *cfg = dev->config;
+	struct max32_gpio_data *data = dev->data;
 
-	unsigned int flags = MXC_GPIO_GetFlags(GPIO_CFG(dev)->regs);
+	unsigned int flags = MXC_GPIO_GetFlags(cfg->regs);
 	/* clear interrupt flags */
-	MXC_GPIO_ClearFlags(GPIO_CFG(dev)->regs, flags);
+	MXC_GPIO_ClearFlags(cfg->regs, flags);
 
-	gpio_fire_callbacks(&(GPIO_DATA(dev)->cb_list), dev, flags);
+	gpio_fire_callbacks(&(data->cb_list), dev, flags);
 }
 
 static int gpio_max32_init(const struct device *dev)

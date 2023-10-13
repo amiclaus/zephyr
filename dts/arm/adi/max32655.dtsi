@@ -20,9 +20,9 @@
 		#size-cells = <0>;
 
 		cpu@0 {
-				device_type = "cpu";
-				compatible = "arm,cortex-m4f";
-				reg = <0>;
+			device_type = "cpu";
+			compatible = "arm,cortex-m4f";
+			reg = <0>;
 		};
 	};
 
@@ -72,8 +72,8 @@
 
 	soc {
 		sram0: memory@20000000 {
-				compatible = "mmio-sram";
-				reg = <0x20000000 DT_SIZE_K(128)>;
+			compatible = "mmio-sram";
+			reg = <0x20000000 DT_SIZE_K(128)>;
 		};
 
 		flc0: flash_controller@40029000 {

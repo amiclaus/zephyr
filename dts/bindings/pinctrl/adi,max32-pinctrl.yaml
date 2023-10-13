@@ -5,9 +5,7 @@ description: |
   MAX32 Pin controller Node
   Based on pincfg-node.yaml binding.
 
-  Note: `bias-disable` and `drive-push-pull` are default pin configurations.
-       They will be applied in case no `bias-foo` or `driver-bar` properties
-       are set.
+  Note: `bias-disable`  are default pin configurations.
 
 compatible: "adi,max32-pinctrl"
 
@@ -20,7 +18,7 @@ properties:
 
 child-binding:
   description: |
-    This binding gives a base representation of the STM32 pins configration
+    Base binding configration for ADI MAX32xxx MCUs
 
   include:
     - name: pincfg-node.yaml
@@ -41,10 +39,10 @@ child-binding:
       type: int
       description: |
         Integer array, represents gpio pin number and mux setting.
-        These defines are calculated as: ((port * 16 + line) << 8) | function
+        These defines are calculated as: (pin<<8 | port<<4 | function<<0)
         With:
         - port: The gpio port index (0, 1, ...)
-        - line: The line offset within the port (0, 1, 2, ...)
+        - pin: The pin offset within the port (0, 1, 2, ...)
         - function: The function number, can be:
         * 0 : GPIO
         * 1 : Alternate Function 1

@@ -17,8 +17,6 @@
 
 LOG_MODULE_REGISTER(uart_max32, CONFIG_UART_LOG_LEVEL);
 
-#define UART_CFG(dev)  ((struct max32_uart_config *)((dev)->config))
-#define UART_DATA(dev) ((struct max32_uart_data *)((dev)->data))
 
 struct max32_uart_config {
 	mxc_uart_regs_t *regs;
@@ -42,14 +40,17 @@ struct max32_uart_data {
 
 static void api_poll_out(const struct device *dev, unsigned char c)
 {
-	MXC_UART_WriteCharacter(UART_CFG(dev)->regs, c);
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_WriteCharacter(cfg->regs, c);
 }
 
 static int api_poll_in(const struct device *dev, unsigned char *c)
 {
 	int val;
+	const struct max32_uart_config *cfg = dev->config;
 
-	val = MXC_UART_ReadCharacterRaw(UART_CFG(dev)->regs);
+	val = MXC_UART_ReadCharacterRaw(cfg->regs);
 	if (val >= 0) {
 		*c = (unsigned char)val;
 	} else {
@@ -63,8 +64,9 @@ static int api_err_check(const struct device *dev)
 {
 	int err = 0;
 	uint32_t flags;
+	const struct max32_uart_config *cfg = dev->config;
 
-	flags = MXC_UART_GetFlags(UART_CFG(dev)->regs);
+	flags = MXC_UART_GetFlags(cfg->regs);
 
 	if (flags & ADI_MAX32_UART_ERROR_FRAMING) {
 		err |= UART_ERROR_FRAMING;
@@ -233,8 +235,9 @@ static int uart_max32_init(const struct device *dev)
 static int api_fifo_fill(const struct device *dev, const uint8_t *tx_data, int size)
 {
 	unsigned int num_tx = 0;
+	const struct max32_uart_config *cfg = dev->config;
 
-	num_tx = MXC_UART_WriteTXFIFO(UART_CFG(dev)->regs, (unsigned char *)tx_data, size);
+	num_tx = MXC_UART_WriteTXFIFO(cfg->regs, (unsigned char *)tx_data, size);
 
 	return (int)num_tx;
 }
@@ -242,40 +245,53 @@ static int api_fifo_fill(const struct device *dev, const uint8_t *tx_data, int s
 static int api_fifo_read(const struct device *dev, uint8_t *rx_data, const int size)
 {
 	unsigned int num_rx = 0;
+	const struct max32_uart_config *cfg = dev->config;
 
-	num_rx = MXC_UART_ReadRXFIFO(UART_CFG(dev)->regs, (unsigned char *)rx_data, size);
+	num_rx = MXC_UART_ReadRXFIFO(cfg->regs, (unsigned char *)rx_data, size);
 
 	return num_rx;
 }
 
 static void api_irq_tx_enable(const struct device *dev)
 {
-	MXC_UART_EnableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_TX);
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_INT_TX);
 }
 
 static void api_irq_tx_disable(const struct device *dev)
 {
-	MXC_UART_DisableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_TX);
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_INT_TX);
 }
 
 static int api_irq_tx_ready(const struct device *dev)
 {
-	return (MXC_UART_GetFlags(UART_CFG(dev)->regs) & ADI_MAX32_UART_INT_TX);
+	const struct max32_uart_config *cfg = dev->config;
+
+	return (MXC_UART_GetFlags(cfg->regs) & ADI_MAX32_UART_INT_TX);
 }
 
 static void api_irq_rx_enable(const struct device *dev)
 {
-	MXC_UART_EnableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_RX);
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
 }
 
 static void api_irq_rx_disable(const struct device *dev)
 {
-	MXC_UART_DisableInt(UART_CFG(dev)->regs, ADI_MAX32_UART_INT_RX);
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
 }
 
 static int api_irq_tx_complete(const struct device *dev)
 {
-	if (MXC_UART_GetActive(UART_CFG(dev)->regs) == E_BUSY) {
+	const struct max32_uart_config *cfg = dev->config;
+
+	if (MXC_UART_GetActive(cfg->regs) == E_BUSY) {
 		return 0;
 	} else {
 		return 1; /* tranmission completed */
@@ -284,7 +300,9 @@ static int api_irq_tx_complete(const struct device *dev)
 
 static int api_irq_rx_ready(const struct device *dev)
 {
-	return (MXC_UART_GetFlags(UART_CFG(dev)->regs) & ADI_MAX32_UART_INT_RX);
+	const struct max32_uart_config *cfg = dev->config;
+
+	return (MXC_UART_GetFlags(cfg->regs) & ADI_MAX32_UART_INT_RX);
 }
 
 static void api_irq_err_enable(const struct device *dev)
@@ -299,7 +317,9 @@ static void api_irq_err_disable(const struct device *dev)
 
 static int api_irq_is_pending(const struct device *dev)
 {
-	return (MXC_UART_GetFlags(UART_CFG(dev)->regs) & (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
+	const struct max32_uart_config *cfg = dev->config;
+
+	return (MXC_UART_GetFlags(cfg->regs) & (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
 }
 
 static int api_irq_update(const struct device *dev)
