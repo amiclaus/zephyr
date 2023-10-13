@@ -18,26 +18,56 @@ LOG_MODULE_REGISTER(wdt_max32);
 
 #include <wrap_max32_wdt.h>
 
-#define WDT_CFG(dev)  ((struct max32_wdt_config *)((dev)->config))
-#define WDT_DATA(dev) ((struct max32_wdt_data *)((dev)->data))
-
 struct max32_wdt_config {
 	mxc_wdt_regs_t *regs;
 	int clock_source;
 	const struct device *clock;
 	struct max32_perclk perclk;
+	void (*irq_func)(void);
 };
 
 struct max32_wdt_data {
-	uint32_t timeout;
+	struct wdt_window timeout;
 	wdt_callback_t callback;
 };
 
-static int wdt_max32_calculate_timeout(uint32_t timeout)
+static int wdt_max32_calculate_timeout(uint32_t timeout, uint32_t clock_src)
 {
 	int i;
+	uint32_t clk_frequency = 0;
+	uint32_t number_of_tick = 0;
 
-	uint32_t number_of_tick = ((float)timeout * (float)PeripheralClock) / 1000;
+	switch (clock_src) {
+	case ADI_MAX32_PRPH_CLK_SRC_PCLK:
+		clk_frequency = PeripheralClock;
+		break;
+
+	case ADI_MAX32_PRPH_CLK_SRC_EXTCLK:
+		clk_frequency = EXTCLK_FREQ;
+		break;
+
+	case ADI_MAX32_PRPH_CLK_SRC_IBRO:
+		clk_frequency = IBRO_FREQ;
+		break;
+
+	case ADI_MAX32_PRPH_CLK_SRC_ERFO:
+		clk_frequency = ERFO_FREQ;
+		break;
+
+	case ADI_MAX32_PRPH_CLK_SRC_ERTCO:
+		clk_frequency = ERTCO_FREQ;
+		break;
+
+	case ADI_MAX32_PRPH_CLK_SRC_INRO:
+		clk_frequency = INRO_FREQ;
+		break;
+
+	default:
+		LOG_ERR("Unsupported clock source.");
+		return -ENOTSUP;
+	}
+
+	number_of_tick = ((float)timeout * (float)clk_frequency) / 1000;
 
 	/* Find top bit index */
 	for (i = 31; i >= 16; i--) {
@@ -55,12 +85,14 @@ static int wdt_max32_calculate_timeout(uint32_t timeout)
 		i = 16; /* min */
 	}
 
-	return i;
+	/* It returns 31 - i because period thresholds are inverse ordered in register. */
+	return (31 - i);
 }
 
 static int api_disable(const struct device *dev)
 {
-	MXC_WDT_Disable(WDT_CFG(dev)->regs);
+	const struct max32_wdt_config *cfg = dev->config;
+	MXC_WDT_Disable(cfg->regs);
 	return 0;
 }
 
@@ -68,58 +100,143 @@ static int api_feed(const struct device *dev, int channel_id)
 {
 	ARG_UNUSED(channel_id);
 
-	MXC_WDT_ResetTimer(WDT_CFG(dev)->regs);
+	const struct max32_wdt_config *cfg = dev->config;
+	MXC_WDT_ResetTimer(cfg->regs);
 	return 0;
 }
 
 static int api_setup(const struct device *dev, uint8_t options)
 {
-	MXC_WDT_Enable(WDT_CFG(dev)->regs);
-	api_feed(dev, 0);
+	const struct max32_wdt_config *cfg = dev->config;
+
+	if (options & WDT_OPT_PAUSE_IN_SLEEP) {
+		return -ENOTSUP;
+	}
+
+	MXC_WDT_ResetTimer(cfg->regs);
+	MXC_WDT_Enable(cfg->regs);
 	return 0;
 }
 
 static int api_install_timeout(const struct device *dev, const struct wdt_timeout_cfg *cfg)
 {
+	const struct max32_wdt_config *dev_cfg = dev->config;
 	struct max32_wdt_data *data = dev->data;
-	wrap_mxc_wdt_cfg_t wdt_cfg;
+	mxc_wdt_regs_t *regs = dev_cfg->regs;
+	mxc_wdt_cfg_t wdt_cfg;
 
-	if ((cfg->window.min != 0U) || (cfg->window.max == 0U)) {
+	if (cfg->window.max == 0U) {
 		return -EINVAL;
 	}
 
-	data->timeout = cfg->window.max;
+	data->timeout = cfg->window;
 	data->callback = cfg->callback;
 
-	int period = 31 - wdt_max32_calculate_timeout(data->timeout);
+	if (data->timeout.min > 0) {
+		wdt_cfg.mode = MXC_WDT_WINDOWED;
 
-	wdt_cfg.upperResetPeriod = period;
+		int ret = Wrap_MXC_WDT_SetMode(regs, &wdt_cfg);
+		if (ret != E_NO_ERROR) {
+			LOG_DBG("%s does not support windowed mode.", CONFIG_BOARD);
+			return -EINVAL;
+		}
 
-	Wrap_MXC_WDT_SetResetPeriod(WDT_CFG(dev)->regs, &wdt_cfg);
+		int lower_timeout_period =
+			wdt_max32_calculate_timeout(data->timeout.min, dev_cfg->clock_source);
+		if (lower_timeout_period == -ENOTSUP) {
+			return -EINVAL;
+		}
+
+		if ((lower_timeout_period != 0xF) | (data->callback == NULL)) {
+			wdt_cfg.lowerResetPeriod = lower_timeout_period;
+			wdt_cfg.lowerIntPeriod = lower_timeout_period + 1;
+		} else {
+			wdt_cfg.lowerResetPeriod = lower_timeout_period - 1;
+			wdt_cfg.lowerIntPeriod = lower_timeout_period;
+		}
+	}
+
+	int upper_timeout_period =
+		wdt_max32_calculate_timeout(data->timeout.max, dev_cfg->clock_source);
+	if (upper_timeout_period == -ENOTSUP) {
+		return -EINVAL;
+	}
+
+	if ((upper_timeout_period != 0xF) | (data->callback == NULL)) {
+		wdt_cfg.upperResetPeriod = upper_timeout_period;
+		wdt_cfg.upperIntPeriod = upper_timeout_period + 1;
+	} else {
+		wdt_cfg.upperResetPeriod = upper_timeout_period - 1;
+		wdt_cfg.upperIntPeriod = upper_timeout_period;
+	}
+
+	Wrap_MXC_WDT_SetResetPeriod(regs, &wdt_cfg);
+
+	switch (cfg->flags) {
+	case WDT_FLAG_RESET_SOC:
+		MXC_WDT_EnableReset(regs);
+		LOG_DBG("Configuring reset SOC mode.");
+		break;
+
+	case WDT_FLAG_RESET_NONE:
+		MXC_WDT_DisableReset(regs);
+		LOG_DBG("Configuring non-reset mode.");
+		break;
+
+	default:
+		LOG_ERR("Unsupported watchdog config flag.");
+		return -ENOTSUP;
+	}
+
+	/* If callback is not null, enable interrupt. */
+	if (data->callback) {
+		Wrap_MXC_WDT_SetIntPeriod(regs, &wdt_cfg);
+		MXC_WDT_EnableInt(regs);
+	}
 
 	return 0;
+}
+
+static void wdt_max32_isr(const void *param)
+{
+	const struct device *dev = (const struct device *)param;
+	const struct max32_wdt_config *cfg = dev->config;
+	struct max32_wdt_data *data = dev->data;
+
+	if (data->callback) {
+		data->callback(dev, 0);
+	}
+
+	MXC_WDT_ClearIntFlag(cfg->regs);
 }
 
 static int wdt_max32_init(const struct device *dev)
 {
 	int ret = 0;
-	wrap_mxc_wdt_cfg_t wdt_cfg;
+	const struct max32_wdt_config *cfg = dev->config;
+	mxc_wdt_regs_t *regs = cfg->regs;
+	mxc_wdt_cfg_t wdt_cfg = {.mode = MXC_WDT_COMPATIBILITY,
+				 .upperResetPeriod = 0,
+				 .lowerResetPeriod = 0,
+				 .upperIntPeriod = 0,
+				 .lowerIntPeriod = 0};
 
-	/* enable clock */
-	ret = clock_control_on(WDT_CFG(dev)->clock,
-			       (clock_control_subsys_t) &(WDT_CFG(dev)->perclk));
+	/* Enable clock */
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
 	if (ret) {
 		return ret;
 	}
 
-	wdt_cfg.mode = 0; /* Todo set mode during usage*/
-	wdt_cfg.upperResetPeriod = 0; /* Not used during initialization */
-	wdt_cfg.lowerResetPeriod = 0; /* Not used during initialization */
-	wdt_cfg.upperIntPeriod = 0;   /* Not used during initialization */
-	wdt_cfg.lowerIntPeriod = 0;   /* Not used during initialization */
-	Wrap_MXC_WDT_Init(WDT_CFG(dev)->regs, &wdt_cfg);
+	Wrap_MXC_WDT_Init(regs, &wdt_cfg);
 
-	MXC_WDT_EnableReset(WDT_CFG(dev)->regs);
+	/* Disable all actions */
+	MXC_WDT_Disable(regs);
+	MXC_WDT_DisableReset(regs);
+	MXC_WDT_DisableInt(regs);
+	MXC_WDT_ClearResetFlag(regs);
+	MXC_WDT_ClearIntFlag(regs);
+
+	cfg->irq_func(); /* WDT IRQ enable*/
 
 	return 0;
 }
@@ -130,6 +247,12 @@ static const struct wdt_driver_api max32_wdt_api = {.setup = api_setup,
 						    .feed = api_feed};
 
 #define MAX32_WDT_INIT(_num)                                                                       \
+	static void wdt_max32_irq_init_##_num(void)                                                \
+	{                                                                                          \
+		IRQ_CONNECT(DT_INST_IRQN(_num), DT_INST_IRQ(_num, priority), wdt_max32_isr,        \
+			    DEVICE_DT_INST_GET(_num), 0);                                          \
+		irq_enable(DT_INST_IRQN(_num));                                                    \
+	}                                                                                          \
 	static struct max32_wdt_data max32_wdt_data##_num;                                         \
 	static struct max32_wdt_config max32_wdt_config##_num = {                                  \
 		.regs = (mxc_wdt_regs_t *)DT_INST_REG_ADDR(_num),                                  \
@@ -137,6 +260,7 @@ static const struct wdt_driver_api max32_wdt_api = {.setup = api_setup,
 		.clock_source = DT_INST_PROP(_num, clock_source),                                  \
 		.perclk.bus = DT_INST_CLOCKS_CELL(_num, offset),                                   \
 		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
+		.irq_func = &wdt_max32_irq_init_##_num,                                            \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(_num, wdt_max32_init, NULL, &max32_wdt_data##_num,                   \
 			      &max32_wdt_config##_num, POST_KERNEL,                                \
