@@ -7,9 +7,20 @@
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/adi_max32_clock_control.h>
 
+#include <wrap_max32_sys.h>
+
 #define DT_DRV_COMPAT adi_max32_gcr
 
-static inline int max32_clock_control_on(const struct device *dev, clock_control_subsys_t clkcfg)
+/** Get prescaler value if it defined  */
+#define ADI_MAX32_SYSCLK_PRESCALER DT_INST_PROP_OR(0, sysclk_prescaler, 0)
+
+struct max32_clkctrl_config {
+	mxc_gcr_regs_t *regs;
+	const struct device *clock;
+	int prescaler;
+};
+
+static inline int api_on(const struct device *dev, clock_control_subsys_t clkcfg)
 {
 	struct max32_perclk *perclk = (struct max32_perclk *)(clkcfg);
 
@@ -22,11 +33,9 @@ static inline int max32_clock_control_on(const struct device *dev, clock_control
 	case ADI_MAX32_CLOCK_BUS1:
 		MXC_SYS_ClockEnable((mxc_sys_periph_clock_t)(perclk->bit + 32));
 		break;
-#if !defined(CONFIG_SOC_MAX32665) && !defined(CONFIG_SOC_MAX32666)
 	case ADI_MAX32_CLOCK_BUS2:
 		MXC_SYS_ClockEnable((mxc_sys_periph_clock_t)(perclk->bit + 64));
 		break;
-#endif
 	default:
 		return -EINVAL;
 	}
@@ -34,7 +43,7 @@ static inline int max32_clock_control_on(const struct device *dev, clock_control
 	return 0;
 }
 
-static inline int max32_clock_control_off(const struct device *dev, clock_control_subsys_t clkcfg)
+static inline int api_off(const struct device *dev, clock_control_subsys_t clkcfg)
 {
 	struct max32_perclk *perclk = (struct max32_perclk *)(clkcfg);
 
@@ -47,11 +56,9 @@ static inline int max32_clock_control_off(const struct device *dev, clock_contro
 	case ADI_MAX32_CLOCK_BUS1:
 		MXC_SYS_ClockDisable((mxc_sys_periph_clock_t)(perclk->bit + 32));
 		break;
-#if !defined(CONFIG_SOC_MAX32665) && !defined(CONFIG_SOC_MAX32666)
 	case ADI_MAX32_CLOCK_BUS2:
 		MXC_SYS_ClockDisable((mxc_sys_periph_clock_t)(perclk->bit + 64));
 		break;
-#endif
 	default:
 		return -EINVAL;
 	}
@@ -59,9 +66,9 @@ static inline int max32_clock_control_off(const struct device *dev, clock_contro
 	return 0;
 }
 
-static const struct clock_control_driver_api max32_clock_control_api = {
-	.on = max32_clock_control_on,
-	.off = max32_clock_control_off,
+static const struct clock_control_driver_api max32_clkctrl_api = {
+	.on = api_on,
+	.off = api_off,
 };
 
 static void setup_fixed_clocks(void)
@@ -102,7 +109,7 @@ static void setup_fixed_clocks(void)
 		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_ERTCO);
 	}
 
-#if !defined(CONFIG_SOC_MAX32665) && !defined(CONFIG_SOC_MAX32666)
+#if DT_NODE_HAS_COMPAT(DT_NODELABEL(clk_extclk), fixed_clock)
 	if (IS_ENABLED(ADI_MAX32_CLK_EXTCLK_ENABLED)) {
 		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_EXTCLK);
 	} else {
@@ -111,7 +118,7 @@ static void setup_fixed_clocks(void)
 #endif
 }
 
-static int max32_clock_control_init(const struct device *dev)
+static int max32_clkctrl_init(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
@@ -120,13 +127,24 @@ static int max32_clock_control_init(const struct device *dev)
 
 	/* Setup device clock source */
 	MXC_SYS_Clock_Select(ADI_MAX32_SYSCLK_SRC);
+
+#if DT_NODE_HAS_PROP(DT_NODELABEL(gcr), sysclk_prescaler)
 	/* Setup divider */
-#if defined(CONFIG_SOC_MAX32665) || (CONFIG_SOC_MAX32666) || (CONFIG_SOC_MAX32655)
 	Wrap_MXC_SYS_SetClockDiv(sysclk_prescaler(ADI_MAX32_SYSCLK_PRESCALER));
 #endif
 
 	return 0;
 }
 
-DEVICE_DT_INST_DEFINE(0, max32_clock_control_init, NULL, NULL, NULL, PRE_KERNEL_1,
-		      CONFIG_CLOCK_CONTROL_INIT_PRIORITY, &max32_clock_control_api);
+#define MAX32_CLOCK_CONTROL_INIT(_num)                                                             \
+	static struct max32_clkctrl_config max32_clkctrl_config##_num = {                          \
+		.regs = (mxc_gcr_regs_t *)DT_INST_REG_ADDR(_num),                                  \
+		.prescaler = DT_PROP_OR(_num, sysclk_prescaler, 0),                                \
+	};                                                                                         \
+	DEVICE_DT_INST_DEFINE(_num, max32_clkctrl_init, NULL, NULL, &max32_clkctrl_config##_num,   \
+			      PRE_KERNEL_1, CONFIG_CLOCK_CONTROL_INIT_PRIORITY,                    \
+			      &max32_clkctrl_api)
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(gcr), okay)
+MAX32_CLOCK_CONTROL_INIT(0);
+#endif

@@ -16,7 +16,6 @@ properties:
 
   sysclk-prescaler:
     type: int
-    required: true
     enum:
       - 1
       - 2
@@ -28,7 +27,8 @@ properties:
 
     description: |
         SYSCLK prescaler. Defines actual core clock frequency SYSCLK
-        based on system frequency input.
+        based on system frequency input. Some MAX32xxx devices does not
+        support this feature, check your device user guide before using it.
 
 clock-cells:
   - offset

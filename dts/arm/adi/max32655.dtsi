@@ -98,6 +98,7 @@
 			#clock-cells = <2>;
 			clocks = <&clk_ipo>;
 			sysclk-prescaler = <1>;
+			status = "okay";
 		};
 
 		pinctrl: pin-controller@40008000 {
