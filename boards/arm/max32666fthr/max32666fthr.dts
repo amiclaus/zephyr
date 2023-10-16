@@ -61,6 +61,7 @@
 	pinctrl-0 = <&uart1_tx_p1_13 &uart1_rx_p1_12>;
 	pinctrl-names = "default";
 	current-speed = <115200>;
+	data-bits = <8>;
 	parity = "none";
 	status = "okay";
 };

@@ -35,6 +35,3 @@ properties:
       - 5: "ADI_MAX32_PRPH_CLK_SRC_INRO" Internal Ring Oscillator
       The target device might not support all option please take a look on
       target device user guide
-
-  data-bits:
-    default: 8
