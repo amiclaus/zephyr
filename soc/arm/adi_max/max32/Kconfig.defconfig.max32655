@@ -11,8 +11,4 @@ config SOC
 config NUM_IRQS
 	default 125
 
-config SERIAL_SUPPORT_INTERRUPT
-	bool
-	default n
-
 endif # SOC_MAX32655
