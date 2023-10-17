@@ -135,7 +135,7 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 	if (data->timeout.min > 0) {
 		wdt_cfg.mode = MXC_WDT_WINDOWED;
 
-		int ret = Wrap_MXC_WDT_SetMode(regs, &wdt_cfg);
+		int ret = Wrap_MXC_WDT_Init(regs, &wdt_cfg);
 		if (ret != E_NO_ERROR) {
 			LOG_DBG("%s does not support windowed mode.", CONFIG_BOARD);
 			return -EINVAL;
@@ -215,19 +215,12 @@ static int wdt_max32_init(const struct device *dev)
 	int ret = 0;
 	const struct max32_wdt_config *cfg = dev->config;
 	mxc_wdt_regs_t *regs = cfg->regs;
-	mxc_wdt_cfg_t wdt_cfg = {.mode = MXC_WDT_COMPATIBILITY,
-				 .upperResetPeriod = 0,
-				 .lowerResetPeriod = 0,
-				 .upperIntPeriod = 0,
-				 .lowerIntPeriod = 0};
 
 	/* Enable clock */
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) & (cfg->perclk));
 	if (ret) {
 		return ret;
 	}
-
-	Wrap_MXC_WDT_Init(regs, &wdt_cfg);
 
 	/* Disable all actions */
 	MXC_WDT_Disable(regs);
