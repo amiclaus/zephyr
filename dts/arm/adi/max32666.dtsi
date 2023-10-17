@@ -375,9 +375,9 @@
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 5>;
 			interrupts = <28 0>, <29 0>, <30 0>, <31 0>,
 						 <68 0>, <69 0>, <70 0>, <71 0>;
-			dma-channels = <16>;
+			dma-channels = <8>;
 			status = "disabled";
-			#dma-cells = <0>;
+			#dma-cells = <1>;
 		};
 
 		dma1: dma@40035000 {
@@ -388,7 +388,7 @@
 					     <76 0>, <77 0>, <78 0>, <79 0>;
 			dma-channels = <8>;
 			status = "disabled";
-			#dma-cells = <0>;
+			#dma-cells = <1>;
 		};
 
 	};

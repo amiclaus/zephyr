@@ -21,4 +21,8 @@ properties:
   #   required: true
 
   "#dma-cells":
-    const: 0
+    const: 1
+
+# Parameter syntax
+dma-cells:
+  - channel
