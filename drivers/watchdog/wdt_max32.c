@@ -43,23 +43,23 @@ static int wdt_max32_calculate_timeout(uint32_t timeout, uint32_t clock_src)
 		break;
 
 	case ADI_MAX32_PRPH_CLK_SRC_EXTCLK:
-		clk_frequency = EXTCLK_FREQ;
+		clk_frequency = ADI_MAX32_CLK_EXTCLK_FREQ;
 		break;
 
 	case ADI_MAX32_PRPH_CLK_SRC_IBRO:
-		clk_frequency = IBRO_FREQ;
+		clk_frequency = ADI_MAX32_CLK_IBRO_FREQ;
 		break;
 
 	case ADI_MAX32_PRPH_CLK_SRC_ERFO:
-		clk_frequency = ERFO_FREQ;
+		clk_frequency = ADI_MAX32_CLK_ERFO_FREQ;
 		break;
 
 	case ADI_MAX32_PRPH_CLK_SRC_ERTCO:
-		clk_frequency = ERTCO_FREQ;
+		clk_frequency = ADI_MAX32_CLK_ERTCO_FREQ;
 		break;
 
 	case ADI_MAX32_PRPH_CLK_SRC_INRO:
-		clk_frequency = INRO_FREQ;
+		clk_frequency = ADI_MAX32_CLK_INRO_FREQ;
 		break;
 
 	default:
@@ -123,7 +123,7 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 	const struct max32_wdt_config *dev_cfg = dev->config;
 	struct max32_wdt_data *data = dev->data;
 	mxc_wdt_regs_t *regs = dev_cfg->regs;
-	mxc_wdt_cfg_t wdt_cfg;
+	wrap_mxc_wdt_cfg_t wdt_cfg;
 
 	if (cfg->window.max == 0U) {
 		return -EINVAL;
@@ -131,6 +131,13 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 
 	data->timeout = cfg->window;
 	data->callback = cfg->callback;
+
+	/* Default values to eliminate warnings */
+	wdt_cfg.mode = MXC_WDT_COMPATIBILITY;
+	wdt_cfg.upperResetPeriod = 0;
+	wdt_cfg.lowerResetPeriod = 0;
+	wdt_cfg.upperIntPeriod = 0;
+	wdt_cfg.lowerIntPeriod = 0;
 
 	if (data->timeout.min > 0) {
 		wdt_cfg.mode = MXC_WDT_WINDOWED;
@@ -147,12 +154,22 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 			return -EINVAL;
 		}
 
-		if ((lower_timeout_period != 0xF) | (data->callback == NULL)) {
+		if (data->callback == NULL) {
 			wdt_cfg.lowerResetPeriod = lower_timeout_period;
-			wdt_cfg.lowerIntPeriod = lower_timeout_period + 1;
+			wdt_cfg.lowerIntPeriod = lower_timeout_period; /* Not used */
 		} else {
-			wdt_cfg.lowerResetPeriod = lower_timeout_period - 1;
-			wdt_cfg.lowerIntPeriod = lower_timeout_period;
+			switch (lower_timeout_period) {
+			case MXC_WDT_PERIOD_2_16: /* Min timeout */
+				wdt_cfg.lowerResetPeriod = MXC_WDT_PERIOD_2_17;
+				wdt_cfg.lowerIntPeriod = MXC_WDT_PERIOD_2_16;
+				break;
+			default:
+				/* Generate interrupt just before reset */
+				wdt_cfg.lowerResetPeriod = lower_timeout_period;
+				/* +1 means one steps before */
+				wdt_cfg.lowerIntPeriod = lower_timeout_period + 1;
+				break;
+			}
 		}
 	}
 
@@ -162,12 +179,22 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 		return -EINVAL;
 	}
 
-	if ((upper_timeout_period != 0xF) | (data->callback == NULL)) {
+	if (data->callback == NULL) {
 		wdt_cfg.upperResetPeriod = upper_timeout_period;
-		wdt_cfg.upperIntPeriod = upper_timeout_period + 1;
+		wdt_cfg.upperIntPeriod = upper_timeout_period; /* Not used */
 	} else {
-		wdt_cfg.upperResetPeriod = upper_timeout_period - 1;
-		wdt_cfg.upperIntPeriod = upper_timeout_period;
+		switch (upper_timeout_period) {
+		case MXC_WDT_PERIOD_2_16: /* Min timeout */
+			wdt_cfg.upperResetPeriod = MXC_WDT_PERIOD_2_17;
+			wdt_cfg.upperIntPeriod = MXC_WDT_PERIOD_2_16;
+			break;
+		default:
+			/* Generate interrupt just before reset */
+			wdt_cfg.upperResetPeriod = upper_timeout_period;
+			/* +1 means one steps before */
+			wdt_cfg.upperIntPeriod = upper_timeout_period + 1;
+			break;
+		}
 	}
 
 	Wrap_MXC_WDT_SetResetPeriod(regs, &wdt_cfg);
