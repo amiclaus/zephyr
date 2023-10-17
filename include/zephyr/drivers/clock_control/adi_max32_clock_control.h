@@ -20,74 +20,35 @@ struct max32_perclk {
 	uint32_t bit;
 };
 
-/*
- *  Which clock enabled?
- */
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_ipo), fixed_clock, okay)
-#define ADI_MAX32_CLK_IPO_ENABLED 1
 #define ADI_MAX32_CLK_IPO_FREQ    DT_PROP(DT_NODELABEL(clk_ipo), clock_frequency)
-#endif
-
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_erfo), fixed_clock, okay)
-#define ADI_MAX32_CLK_ERFO_ENABLED 1
-#define ADI_MAX32_CLK_ERFO_FREQ    DT_PROP(DT_NODELABEL(clk_erfo), clock_frequency)
-#endif
-
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_ibro), fixed_clock, okay)
-#define ADI_MAX32_CLK_IBRO_ENABLED 1
-#define ADI_MAX32_CLK_IBRO_FREQ    DT_PROP(DT_NODELABEL(clk_ibro), clock_frequency)
-#endif
-
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_iso), fixed_clock, okay)
-#define ADI_MAX32_CLK_ISO_ENABLED 1
+#define ADI_MAX32_CLK_ERFO_FREQ   DT_PROP(DT_NODELABEL(clk_erfo), clock_frequency)
+#define ADI_MAX32_CLK_IBRO_FREQ   DT_PROP(DT_NODELABEL(clk_ibro), clock_frequency)
 #define ADI_MAX32_CLK_ISO_FREQ    DT_PROP(DT_NODELABEL(clk_iso), clock_frequency)
-#endif
-
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_inro), fixed_clock, okay)
-#define ADI_MAX32_CLK_INRO_ENABLED 1
-#define ADI_MAX32_CLK_INRO_FREQ    DT_PROP(DT_NODELABEL(clk_inro), clock_frequency)
-#endif
-
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_ertco), fixed_clock, okay)
-#define ADI_MAX32_CLK_ERTCO_ENABLED 1
-#define ADI_MAX32_CLK_ERTCO_FREQ    DT_PROP(DT_NODELABEL(clk_ertco), clock_frequency)
-#endif
-
-#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_extclk), fixed_clock, okay)
-#define ADI_MAX32_CLK_EXTCLK_ENABLED 1
-#define ADI_MAX32_CLK_EXTCLK_FREQ    DT_PROP(DT_NODELABEL(clk_extclk), clock_frequency)
-#endif
-
+#define ADI_MAX32_CLK_INRO_FREQ   DT_PROP(DT_NODELABEL(clk_inro), clock_frequency)
+#define ADI_MAX32_CLK_ERTCO_FREQ  DT_PROP(DT_NODELABEL(clk_ertco), clock_frequency)
+/* External clock may not be defined so _OR is used */
+#define ADI_MAX32_CLK_EXTCLK_FREQ DT_PROP_OR(DT_NODELABEL(clk_extclk), clock_frequency, 0)
 
 #define DT_GCR_CLOCKS_CTRL DT_CLOCKS_CTLR(DT_NODELABEL(gcr))
 
-/* To enable use of IS_ENABLED utility macro, these symbols
- * should not be defined directly using DT_SAME_NODE.
- */
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_ipo))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_IPO
 #endif
-
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_erfo))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_ERFO
 #endif
-
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_ibro))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_IBRO
 #endif
-
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_iso))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_ISO
 #endif
-
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_inro))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_INRO
 #endif
-
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_ertco))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_ERTCO
 #endif
-
 #if DT_SAME_NODE(DT_GCR_CLOCKS_CTRL, DT_NODELABEL(clk_extclk))
 #define ADI_MAX32_SYSCLK_SRC ADI_MAX32_CLK_EXTCLK
 #endif

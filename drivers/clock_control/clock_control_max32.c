@@ -45,9 +45,8 @@ static inline int api_on(const struct device *dev, clock_control_subsys_t clkcfg
 
 static inline int api_off(const struct device *dev, clock_control_subsys_t clkcfg)
 {
-	struct max32_perclk *perclk = (struct max32_perclk *)(clkcfg);
-
 	ARG_UNUSED(dev);
+	struct max32_perclk *perclk = (struct max32_perclk *)(clkcfg);
 
 	switch (perclk->bus) {
 	case ADI_MAX32_CLOCK_BUS0:
@@ -73,48 +72,37 @@ static const struct clock_control_driver_api max32_clkctrl_api = {
 
 static void setup_fixed_clocks(void)
 {
-	if (IS_ENABLED(ADI_MAX32_CLK_IPO_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_IPO);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_IPO);
-	}
-
-	if (IS_ENABLED(ADI_MAX32_CLK_ERFO_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_ERFO);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_ERFO);
-	}
-
-	if (IS_ENABLED(ADI_MAX32_CLK_IBRO_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_IBRO);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_IBRO);
-	}
-
-	if (IS_ENABLED(ADI_MAX32_CLK_ISO_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_ISO);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_ISO);
-	}
-
-	if (IS_ENABLED(ADI_MAX32_CLK_INRO_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_INRO);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_INRO);
-	}
-
-	if (IS_ENABLED(ADI_MAX32_CLK_ERTCO_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_ERTCO);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_ERTCO);
-	}
-
 #if DT_NODE_HAS_COMPAT(DT_NODELABEL(clk_extclk), fixed_clock)
-	if (IS_ENABLED(ADI_MAX32_CLK_EXTCLK_ENABLED)) {
-		MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_EXTCLK);
-	} else {
-		MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_EXTCLK);
-	}
+	MXC_SYS_ClockSourceDisable(ADI_MAX32_CLK_EXTCLK);
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(clk_ipo), okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_IPO);
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(clk_erfo), okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_ERFO);
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(clk_ibro), okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_IBRO);
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(clk_iso), okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_ISO);
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(clk_inro), okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_INRO);
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(clk_ertco), okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_ERTCO);
+#endif
+
+/* Some device does not support external clock */
+#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(clk_extclk), fixed_clock, okay)
+	MXC_SYS_ClockSourceEnable(ADI_MAX32_CLK_EXTCLK);
 #endif
 }
 
