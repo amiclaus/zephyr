@@ -165,6 +165,15 @@
 			status = "disabled";
 		};
 
+		uart3: serial@40081400 {
+			compatible = "adi,max32-uart";
+			reg = <0x40081400 0x1000>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS2 4>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_IBRO>;
+			interrupts = <88 0>;
+			status = "disabled";
+		};
+
 		i2c0: i2c0@4001d000 {
 			compatible = "adi,max32-i2c";
 			reg = <0x4001d000 0x1000>;
@@ -223,7 +232,7 @@
 			interrupts = <28 0>, <29 0>, <30 0>, <31 0>;
 			dma-channels = <4>;
 			status = "disabled";
-			#dma-cells = <0>;
+			#dma-cells = <1>;
 		};
 
 		rtc: rtc@40006000 {
