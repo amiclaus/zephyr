@@ -14,11 +14,6 @@
 /** Get prescaler value if it defined  */
 #define ADI_MAX32_SYSCLK_PRESCALER DT_INST_PROP_OR(0, sysclk_prescaler, 0)
 
-struct max32_clkctrl_config {
-	mxc_gcr_regs_t *regs;
-	const struct device *clock;
-	int prescaler;
-};
 
 static inline int api_on(const struct device *dev, clock_control_subsys_t clkcfg)
 {
@@ -124,15 +119,5 @@ static int max32_clkctrl_init(const struct device *dev)
 	return 0;
 }
 
-#define MAX32_CLOCK_CONTROL_INIT(_num)                                                             \
-	static struct max32_clkctrl_config max32_clkctrl_config##_num = {                          \
-		.regs = (mxc_gcr_regs_t *)DT_INST_REG_ADDR(_num),                                  \
-		.prescaler = DT_PROP_OR(_num, sysclk_prescaler, 0),                                \
-	};                                                                                         \
-	DEVICE_DT_INST_DEFINE(_num, max32_clkctrl_init, NULL, NULL, &max32_clkctrl_config##_num,   \
-			      PRE_KERNEL_1, CONFIG_CLOCK_CONTROL_INIT_PRIORITY,                    \
-			      &max32_clkctrl_api)
-
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(gcr), okay)
-MAX32_CLOCK_CONTROL_INIT(0);
-#endif
+DEVICE_DT_INST_DEFINE(0, max32_clkctrl_init, NULL, NULL, NULL, PRE_KERNEL_1,
+		      CONFIG_CLOCK_CONTROL_INIT_PRIORITY, &max32_clkctrl_api);

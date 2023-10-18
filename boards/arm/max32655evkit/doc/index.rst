@@ -1,6 +1,6 @@
 .. _max32655_evkit:
 
-MAX32655 EVKIT
+MAX32655EVKIT
 ######
 
 Overview
@@ -29,9 +29,8 @@ Hardware
   - Ultra-Low-Power Wireless Microcontroller
     - Internal 100MHz Oscillator
     - Flexible Low-Power Modes with 7.3728MHz System Clock Option
-    - 512KB Flash and 128KB SRAM
-      - Optional ECC on One 32KB SRAM Bank
-    - 16KB Instruction Cache 
+    - 512KB Flash and 128KB SRAM (Optional ECC on One 32KB SRAM Bank)
+    - 16KB Instruction Cache
   - Bluetooth 5.2 LE Radio
     - Dedicated, Ultra-Low-Power, 32-Bit RISC-V Coprocessor to Offload Timing-Critical Bluetooth Processing
     - Fully Open-Source Bluetooth 5.2 Stack Available
@@ -166,7 +165,7 @@ instead of ``west flash``.
 References
 **********
 
-- `MAX32655 EVKIT web page`_
+- `MAX32655EVKIT web page`_
 
-.. MAX32655 EVKIT web page:
+.. _MAX32655EVKIT web page:
    https://www.analog.com/en/design-center/evaluation-hardware-and-software/evaluation-boards-kits/max32655evkit.html#eb-overview

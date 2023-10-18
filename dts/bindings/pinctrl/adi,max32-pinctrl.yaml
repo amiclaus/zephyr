@@ -86,4 +86,5 @@ child-binding:
           Mode 1: 2mA
           Mode 2: 4mA
           Mode 3: 8mA
-          For more information please take a look device datasheet
+          Default GPIO output drive strength is mode 0 for MAX32 MCUs.
+          For more information please take a look device user guide, datasheet.

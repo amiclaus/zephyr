@@ -180,6 +180,7 @@
 			compatible = "adi,max32-uart";
 			reg = <0x40042000 0xfff>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 9>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_PCLK>;
 			interrupts = <14 0>;
 			status = "disabled";
 		};
@@ -188,6 +189,7 @@
 			compatible = "adi,max32-uart";
 			reg = <0x40043000 0xfff>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 10>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_PCLK>;
 			interrupts = <15 0>;
 			status = "disabled";
 		};
@@ -196,6 +198,7 @@
 			compatible = "adi,max32-uart";
 			reg = <0x40044000 0xfff>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 1>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_PCLK>;
 			interrupts = <34 0>;
 			status = "disabled";
 		};
