@@ -17,7 +17,6 @@
 
 LOG_MODULE_REGISTER(uart_max32, CONFIG_UART_LOG_LEVEL);
 
-
 struct max32_uart_config {
 	mxc_uart_regs_t *regs;
 	int clock_source;
@@ -207,7 +206,7 @@ static int uart_max32_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) & (cfg->perclk));
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
 	if (ret != 0) {
 		LOG_ERR("cannot enable UART clock");
 		return ret;
@@ -337,7 +336,7 @@ static int api_irq_update(const struct device *dev)
 }
 
 static void api_irq_callback_set(const struct device *dev, uart_irq_callback_user_data_t cb,
-					void *cb_data)
+				 void *cb_data)
 {
 	struct max32_uart_data *const dev_data = (struct max32_uart_data *)(dev->data);
 
@@ -364,8 +363,7 @@ static void uart_max32_isr(const struct device *dev)
 
 #ifdef CONFIG_UART_ASYNC_API
 
-static int api_callback_set(const struct device *dev, uart_callback_t callback,
-				   void *user_data)
+static int api_callback_set(const struct device *dev, uart_callback_t callback, void *user_data)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(callback);
@@ -463,7 +461,7 @@ static const struct uart_driver_api uart_max32_driver_api = {
 		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(_num)),                                 \
 		.perclk.bus = DT_INST_CLOCKS_CELL(_num, offset),                                   \
 		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
-		.clock_source = DT_INST_PROP(_num, clock_source),                                  \
+		.clock_source = DT_INST_PROP_OR(_num, clock_source, 0),                            \
 		.uart_conf.baudrate = DT_INST_PROP(_num, current_speed),                           \
 		.uart_conf.parity = DT_INST_ENUM_IDX_OR(_num, parity, UART_CFG_PARITY_NONE),       \
 		.uart_conf.data_bits = DT_INST_ENUM_IDX(_num, data_bits),                          \
