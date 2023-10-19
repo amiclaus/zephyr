@@ -17,14 +17,12 @@
 
 LOG_MODULE_REGISTER(max32_dma, CONFIG_DMA_LOG_LEVEL);
 
-#define DMA_CFG(dev)  ((struct max32_dma_config *)((dev)->config))
-#define DMA_DATA(dev) ((struct max32_dma_data *)((dev)->data))
-
 struct max32_dma_config {
 	mxc_dma_regs_t *regs;
 	const struct device *clock;
 	struct max32_perclk perclk;
 	uint8_t channels;
+	void (*irq_configure)(void);
 };
 
 struct max32_dma_data {
@@ -70,6 +68,7 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 	int ret = 0;
 	const struct max32_dma_config *cfg = dev->config;
 	struct max32_dma_data *data = dev->data;
+	uint32_t ch;
 
 	if (channel >= cfg->channels) {
 		LOG_ERR("Invalid DMA channel - must be < %" PRIu32 " (%" PRIu32 ")", cfg->channels,
@@ -77,11 +76,13 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 		return -EINVAL;
 	}
 
+	ch = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+
 	/* DMA Channel Config */
 	mxc_dma_config_t mxc_dma_cfg;
 
-	mxc_dma_cfg.ch = channel;
-	mxc_dma_cfg.reqsel = MXC_DMA_REQUEST_MEMTOMEM; /* initial test */
+	mxc_dma_cfg.ch = ch;
+	mxc_dma_cfg.reqsel = config->dma_slot << ADI_MAX32_DMA_CFG_REQ_POS;
 	if (!(is_valid_dma_width(config->source_data_size) ||
 	      !(is_valid_dma_width(config->dest_data_size)))) {
 		LOG_ERR("Invalid DMA width - must be byte (1), halfword (2) or word (4) !");
@@ -97,7 +98,7 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 	/* DMA Channel Advanced Config */
 	mxc_dma_adv_config_t mxc_dma_cfg_adv;
 
-	mxc_dma_cfg_adv.ch = channel;
+	mxc_dma_cfg_adv.ch = ch;
 	if (!is_valid_dma_ch_prio(config->channel_priority)) {
 		LOG_ERR("Invalid DMA priority - must comply with type mxc_dma_priority_t (0 - 3)");
 		return -EINVAL;
@@ -111,17 +112,10 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 	/* DMA Transfer Config */
 	mxc_dma_srcdst_t txfer;
 
-	txfer.ch = channel;
+	txfer.ch = ch;
 	txfer.source = (void *)config->head_block->source_address;
 	txfer.dest = (void *)config->head_block->dest_address;
 	txfer.len = config->head_block->block_size;
-
-	/* Acquire all channels so they are available to Zephyr application */
-	for (int i = 0; i < cfg->channels; i++) {
-		if (Wrap_MXC_DMA_AcquireChannel(cfg->regs) < 0) {
-			break;
-		} /* Channels already acquired */
-	}
 
 	ret = MXC_DMA_ConfigChannel(mxc_dma_cfg, txfer);
 	if (ret != E_NO_ERROR) {
@@ -134,13 +128,13 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 	}
 
 	/* Enable interrupts for the DMA peripheral */
-	ret = MXC_DMA_EnableInt(channel);
+	ret = MXC_DMA_EnableInt(ch);
 	if (ret != E_NO_ERROR) {
 		return ret;
 	}
 
 	/* Enable complete and count-to-zero interrupts for the channel */
-	ret = MXC_DMA_ChannelEnableInt(channel,
+	ret = MXC_DMA_ChannelEnableInt(ch,
 				       ADI_MAX32_DMA_CTRL_DIS_IE | ADI_MAX32_DMA_CTRL_CTZIEN);
 	if (ret != E_NO_ERROR) {
 		return ret;
@@ -156,13 +150,14 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 static inline int api_reload(const struct device *dev, uint32_t channel, uint32_t src,
 				   uint32_t dst, size_t size)
 {
+	const struct max32_dma_config *cfg = dev->config;
 	mxc_dma_srcdst_t reload;
 
-	reload.ch = channel;
+	reload.ch = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
 	reload.source = (void *)src;
 	reload.dest = (void *)dst;
 	reload.len = size;
-	return MXC_DMA_SetSrcReload(reload);
+	return MXC_DMA_SetSrcDst(reload);
 }
 
 static int api_start(const struct device *dev, uint32_t channel)
@@ -174,6 +169,9 @@ static int api_start(const struct device *dev, uint32_t channel)
 			channel);
 		return -EINVAL;
 	}
+
+	channel = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+
 	return MXC_DMA_Start(channel);
 }
 
@@ -187,10 +185,7 @@ static int api_stop(const struct device *dev, uint32_t channel)
 		return -EINVAL;
 	}
 
-	/* Release all channels acquired during config */
-	for (int ch = 0; ch < cfg->channels; ch++) {
-		MXC_DMA_ReleaseChannel(ch);
-	}
+	channel = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
 
 	return MXC_DMA_Stop(channel);
 }
@@ -199,6 +194,8 @@ static inline int api_get_status(const struct device *dev, uint32_t channel,
 				       struct dma_status *stat)
 {
 	const struct max32_dma_config *cfg = dev->config;
+	int ret = 0;
+	int flags = 0;
 
 	if (channel >= cfg->channels) {
 		LOG_ERR("Invalid DMA channel - must be < %" PRIu32 " (%" PRIu32 ")", cfg->channels,
@@ -206,9 +203,9 @@ static inline int api_get_status(const struct device *dev, uint32_t channel,
 		return -EINVAL;
 	}
 
-	int ret = 0;
-	int flags = 0;
+	channel = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
 	mxc_dma_srcdst_t txfer;
+	txfer.ch = channel;
 
 	flags = MXC_DMA_ChannelGetFlags(channel);
 
@@ -217,8 +214,8 @@ static inline int api_get_status(const struct device *dev, uint32_t channel,
 		return ret;
 	}
 
-	/* Channel is busy if no interrupt pending */
-	stat->busy = !(flags & ADI_MAX32_DMA_STATUS_IPEND);
+	/* Channel is busy if channel status is enabled */
+	stat->busy = (flags & ADI_MAX32_DMA_STATUS_ST) != 0;
 	stat->pending_length = txfer.len;
 
 	return ret;
@@ -228,12 +225,14 @@ static void max32_dma_isr(const struct device *dev)
 {
 	const struct max32_dma_config *cfg = dev->config;
 	struct max32_dma_data *data = dev->data;
-	mxc_dma_regs_t *regs = DMA_CFG(dev)->regs;
-	int ch;
+	mxc_dma_regs_t *regs = cfg->regs;
+	int ch, c;
 	int flags;
 	int status = 0;
 
-	for (ch = 0; ch < cfg->channels; ch++) {
+	uint8_t channel_base = Wrap_MXC_DMA_CalculateChannel(cfg->regs, 0);
+
+	for (ch = channel_base, c = 0; c < cfg->channels; ch++, c++) {
 		flags = MXC_DMA_ChannelGetFlags(ch);
 
 		/* Check if channel is in use, if not, move to next channel */
@@ -246,15 +245,15 @@ static void max32_dma_isr(const struct device *dev)
 			status = -EIO;
 		}
 
-		if (data[ch].callback) {
+		MXC_DMA_ChannelClearFlags(ch, flags);
+
+		if (data[c].callback) {
 			/* Only call error callback if enabled during DMA config */
-			if (status < 0 && (!data[ch].err_cb_en)) {
+			if (status < 0 && (!data[c].err_cb_en)) {
 				break;
 			}
-			data[ch].callback(dev, data[ch].cb_data, ch, status);
+			data[c].callback(dev, data[c].cb_data, c, status);
 		}
-
-		MXC_DMA_ChannelClearFlags(ch, flags);
 
 		/* No need to check rest of the channels if no interrupt flags set */
 		if (MXC_DMA_GetIntFlags(regs) == 0) {
@@ -262,15 +261,6 @@ static void max32_dma_isr(const struct device *dev)
 		}
 	}
 }
-
-#define dma DT_NODELABEL(dma0)
-
-#define MAX32_DMA_IRQ_CONNECT(n, inst)                                                             \
-	IRQ_CONNECT(DT_IRQ_BY_IDX(inst, n, irq), DT_IRQ_BY_IDX(inst, n, priority), max32_dma_isr,  \
-		    DEVICE_DT_GET(inst), 0);                                                       \
-	irq_enable(DT_IRQ_BY_IDX(inst, n, irq));
-
-#define CONFIGURE_ALL_IRQS(n) LISTIFY(n, MAX32_DMA_IRQ_CONNECT, (), dma)
 
 static int max32_dma_init(const struct device *dev)
 {
@@ -287,9 +277,22 @@ static int max32_dma_init(const struct device *dev)
 		return ret;
 	}
 
-	CONFIGURE_ALL_IRQS(DT_NUM_IRQS(dma));
+	ret = Wrap_MXC_DMA_Init(cfg->regs);
+	if (ret) {
+		return ret;
+	}
 
-	return Wrap_MXC_DMA_Init(cfg->regs);
+	/* Acquire all channels so they are available to Zephyr application */
+	for (int i = 0; i < cfg->channels; i++) {
+		ret = Wrap_MXC_DMA_AcquireChannel(cfg->regs);
+		if (ret < 0) {
+			break;
+		} /* Channels already acquired */
+	}
+
+	cfg->irq_configure();
+
+	return 0;
 }
 
 static const struct dma_driver_api max32_dma_driver_api = {
@@ -300,16 +303,31 @@ static const struct dma_driver_api max32_dma_driver_api = {
 	.get_status = api_get_status,
 };
 
-static const struct max32_dma_config dma_cfg = {
-	.regs = (mxc_dma_regs_t *)DT_REG_ADDR(dma),
-	.clock = DEVICE_DT_GET(DT_CLOCKS_CTLR(dma)),
-	.perclk.bus = DT_CLOCKS_CELL(dma, offset),
-	.perclk.bit = DT_CLOCKS_CELL(dma, bit),
-	.channels = DT_PROP(dma, dma_channels),
-};
+#define MAX32_DMA_IRQ_CONNECT(n, inst)                                 \
+	IRQ_CONNECT(DT_INST_IRQ_BY_IDX(inst, n, irq),                      \
+				DT_INST_IRQ_BY_IDX(inst, n, priority), max32_dma_isr,  \
+		    DEVICE_DT_INST_GET(inst), 0);                              \
+	irq_enable(DT_INST_IRQ_BY_IDX(inst, n, irq));
 
-/* Callback data for each channel */
-static struct max32_dma_data dma_data[DT_PROP(dma, dma_channels)];
+#define CONFIGURE_ALL_IRQS(inst, n) LISTIFY(n, MAX32_DMA_IRQ_CONNECT, (), inst)
 
-DEVICE_DT_DEFINE(dma, &max32_dma_init, NULL, &dma_data, &dma_cfg, POST_KERNEL,
-		 CONFIG_DMA_INIT_PRIORITY, &max32_dma_driver_api);
+#define MAX32_DMA_INIT(inst) \
+	static struct max32_dma_data \
+		dma##inst##_data[DT_INST_PROP(inst, dma_channels)]; \
+	static void max32_dma##inst##_irq_configure(void)       \
+	{                                                       \
+		CONFIGURE_ALL_IRQS(inst, DT_NUM_IRQS(DT_DRV_INST(inst))); \
+	} \
+	static const struct max32_dma_config dma##inst##_cfg = {	\
+		.regs = (mxc_dma_regs_t *)DT_INST_REG_ADDR(inst),		\
+		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(inst)),	\
+		.perclk.bus = DT_INST_CLOCKS_CELL(inst, offset),		\
+		.perclk.bit = DT_INST_CLOCKS_CELL(inst, bit),			\
+		.channels = DT_INST_PROP(inst, dma_channels),			\
+		.irq_configure = max32_dma##inst##_irq_configure,       \
+	};	\
+	DEVICE_DT_INST_DEFINE(inst, &max32_dma_init, NULL, &dma##inst##_data, \
+		&dma##inst##_cfg, PRE_KERNEL_1, \
+		CONFIG_DMA_INIT_PRIORITY, &max32_dma_driver_api);
+
+DT_INST_FOREACH_STATUS_OKAY(MAX32_DMA_INIT)
