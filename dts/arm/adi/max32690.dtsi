@@ -273,7 +273,7 @@
 					 <79 0>;
 			dma-channels = <16>;
 			status = "disabled";
-			#dma-cells = <1>;
+			#dma-cells = <2>;
 		};
 
 		rtc: rtc@40006000 {

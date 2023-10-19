@@ -377,7 +377,7 @@
 						 <68 0>, <69 0>, <70 0>, <71 0>;
 			dma-channels = <8>;
 			status = "disabled";
-			#dma-cells = <1>;
+			#dma-cells = <2>;
 		};
 
 		dma1: dma@40035000 {
@@ -388,7 +388,7 @@
 					     <76 0>, <77 0>, <78 0>, <79 0>;
 			dma-channels = <8>;
 			status = "disabled";
-			#dma-cells = <1>;
+			#dma-cells = <2>;
 		};
 
 	};
