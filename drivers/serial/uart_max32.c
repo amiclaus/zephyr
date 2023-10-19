@@ -206,7 +206,7 @@ static int uart_max32_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
 	if (ret != 0) {
 		LOG_ERR("cannot enable UART clock");
 		return ret;

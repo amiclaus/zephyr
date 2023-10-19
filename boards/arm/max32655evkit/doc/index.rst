@@ -5,10 +5,10 @@ MAX32655EVKIT
 
 Overview
 ********
-The MAX32655 evaluation kit (EV kit) provides a platform for evaluation capabilities 
-of the MAX32655 microcontroller, which is an advanced system-on-chip (SoC). 
-It features an Arm® Cortex®-M4F CPU for efficient computation of complex functions and 
-algorithms, integrated power management (SIMO), and the newest generation 
+The MAX32655 evaluation kit (EV kit) provides a platform for evaluation capabilities
+of the MAX32655 microcontroller, which is an advanced system-on-chip (SoC).
+It features an Arm® Cortex®-M4F CPU for efficient computation of complex functions and
+algorithms, integrated power management (SIMO), and the newest generation
 Bluetooth® 5.0 Low Energy (Bluetooth LE), long-range radio for wearable and hearable device applications.
 
 The Zephyr port is running on the MAX32655 MCU.
@@ -66,7 +66,7 @@ Hardware
 
   - Color TFT Display
   - Audio Stereo Codec Interface
-  - Digital Microphone 
+  - Digital Microphone
   - A 128Mb QSPI flash
 
 Supported Features
@@ -150,10 +150,10 @@ Flashing
 ========
 
 The MAX32655 MCU can be flashed by connecting an external debug probe to the
-SWD port. SWD debug can be accessed through the Cortex 10-pin connector, JH3. 
+SWD port. SWD debug can be accessed through the Cortex 10-pin connector, JH3.
 Logic levels are fixed to VDDIO (1.8V).
 
-Once the debug probe is connected to your host computer, then you can simply run the 
+Once the debug probe is connected to your host computer, then you can simply run the
 ``west flash`` command to write a firmware image into flash.
 
 Debugging
