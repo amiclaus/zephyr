@@ -136,6 +136,15 @@
 				clocks = <&gcr ADI_MAX32_CLOCK_BUS2 0>;
 				status = "disabled";
 			};
+
+			gpio3: gpio@40080600 {
+				reg = <0x40080600 0x1000>;
+				compatible = "adi,max32-gpio";
+				gpio-controller;
+				#gpio-cells = <2>;
+				interrupts = <54 0>;
+				status = "disabled";
+			};
 		};
 
 		uart0: serial@40042000 {

@@ -18,7 +18,6 @@
 
 LOG_MODULE_REGISTER(gpio_max32, CONFIG_GPIO_LOG_LEVEL);
 
-
 struct max32_gpio_config {
 	struct gpio_driver_config common;
 	mxc_gpio_regs_t *regs;
@@ -277,18 +276,14 @@ static void gpio_max32_isr(const void *param)
 static int gpio_max32_init(const struct device *dev)
 {
 	const struct max32_gpio_config *cfg = dev->config;
-	int ret;
 
-	if (!device_is_ready(cfg->clock)) {
-		LOG_ERR("clock control device not ready");
-		return -ENODEV;
-	}
-
-	/* enable clock */
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
-	if (ret != 0) {
-		LOG_ERR("cannot enable GPIO clock");
-		return ret;
+	if (cfg->clock != NULL) {
+		/* enable clock */
+		int ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
+		if (ret != 0) {
+			LOG_ERR("cannot enable GPIO clock");
+			return ret;
+		}
 	}
 
 	cfg->irq_func();
@@ -310,10 +305,10 @@ static int gpio_max32_init(const struct device *dev)
 				.port_pin_mask = GPIO_PORT_PIN_MASK_FROM_DT_INST(_num),            \
 			},                                                                         \
 		.regs = (mxc_gpio_regs_t *)DT_INST_REG_ADDR(_num),                                 \
-		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(_num)),                                 \
-		.perclk.bus = DT_INST_CLOCKS_CELL(_num, offset),                                   \
-		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
 		.irq_func = &gpio_max32_irq_init_##_num,                                           \
+		.clock = DEVICE_DT_GET_OR_NULL(DT_INST_CLOCKS_CTLR(_num)),                         \
+		.perclk.bus = DT_INST_PHA_BY_IDX_OR(_num, clocks, 0, offset, 0),                   \
+		.perclk.bit = DT_INST_PHA_BY_IDX_OR(_num, clocks, 1, bit, 0),                      \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(_num, gpio_max32_init, NULL, &max32_gpio_data_##_num,                \
 			      &max32_gpio_config_##_num, PRE_KERNEL_1, CONFIG_GPIO_INIT_PRIORITY,  \

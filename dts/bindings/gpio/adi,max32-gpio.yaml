@@ -11,9 +11,6 @@ properties:
   reg:
     required: true
 
-  clocks:
-    required: true
-
   "#gpio-cells":
     const: 2
 
