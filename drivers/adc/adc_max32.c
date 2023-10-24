@@ -36,8 +36,8 @@ struct max32_adc_data {
 
 void adc_complete_cb(void *req, int error)
 {
-	(void) req;
-	(void) error;
+	(void)req;
+	(void)error;
 }
 
 static void adc_max32_start_channel(const struct device *dev)
@@ -194,26 +194,26 @@ static const struct adc_driver_api api_max32_driver_api = {
 #endif /* CONFIG_ADC_ASYNC */
 };
 
-#define MAX32_ADC_INIT(inst)                                                                       \
-	static void max32_adc_config_func_##inst(const struct device *dev);                        \
-	static const struct max32_adc_conf max32_adc_conf_##inst = {                               \
-		.channel_count = DT_PROP(DT_DRV_INST(inst), channel_count),                        \
-		.regs = (mxc_adc_regs_t *)DT_INST_REG_ADDR(inst),                                  \
-		.irq_config_func = max32_adc_config_func_##inst,                                   \
+#define MAX32_ADC_INIT(_num)                                                                       \
+	static void max32_adc_config_func_##_num(const struct device *dev);                        \
+	static const struct max32_adc_conf max32_adc_conf_##_num = {                               \
+		.channel_count = DT_PROP(DT_DRV_INST(_num), channel_count),                        \
+		.regs = (mxc_adc_regs_t *)DT_INST_REG_ADDR(_num),                                  \
+		.irq_config_func = max32_adc_config_func_##_num,                                   \
 	};                                                                                         \
-	static struct max32_adc_data max32_adc_data_##inst = {                                     \
-		ADC_CONTEXT_INIT_TIMER(max32_adc_data_##inst, ctx),                                \
-		ADC_CONTEXT_INIT_LOCK(max32_adc_data_##inst, ctx),                                 \
-		ADC_CONTEXT_INIT_SYNC(max32_adc_data_##inst, ctx),                                 \
+	static struct max32_adc_data max32_adc_data_##_num = {                                     \
+		ADC_CONTEXT_INIT_TIMER(max32_adc_data_##_num, ctx),                                \
+		ADC_CONTEXT_INIT_LOCK(max32_adc_data_##_num, ctx),                                 \
+		ADC_CONTEXT_INIT_SYNC(max32_adc_data_##_num, ctx),                                 \
 	};                                                                                         \
-	DEVICE_DT_INST_DEFINE(inst, &adc_max32_init, NULL, &max32_adc_data_##inst,                 \
-			      &max32_adc_conf_##inst, POST_KERNEL, CONFIG_ADC_INIT_PRIORITY,       \
+	DEVICE_DT_INST_DEFINE(_num, &adc_max32_init, NULL, &max32_adc_data_##_num,                 \
+			      &max32_adc_conf_##_num, POST_KERNEL, CONFIG_ADC_INIT_PRIORITY,       \
 			      &api_max32_driver_api);                                              \
-	static void max32_adc_config_func_##inst(const struct device *dev)                         \
+	static void max32_adc_config_func_##_num(const struct device *dev)                         \
 	{                                                                                          \
-		IRQ_CONNECT(DT_INST_IRQN(inst), DT_INST_IRQ(inst, priority), adc_max32_isr,        \
-			    DEVICE_DT_INST_GET(inst), 0);                                          \
-		irq_enable(DT_INST_IRQN(inst));                                                    \
+		IRQ_CONNECT(DT_INST_IRQN(_num), DT_INST_IRQ(_num, priority), adc_max32_isr,        \
+			    DEVICE_DT_INST_GET(_num), 0);                                          \
+		irq_enable(DT_INST_IRQN(_num));                                                    \
 	}
 
 DT_INST_FOREACH_STATUS_OKAY(MAX32_ADC_INIT)

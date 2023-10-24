@@ -24,7 +24,7 @@ struct i2c_max32_config {
 	uint32_t bitrate;
 };
 
-static int i2c_max32_configure(const struct device *dev, uint32_t dev_cfg)
+static int api_configure(const struct device *dev, uint32_t dev_cfg)
 {
 	int ret = 0;
 	const struct i2c_max32_config *const cfg = dev->config;
@@ -64,21 +64,21 @@ static int i2c_max32_configure(const struct device *dev, uint32_t dev_cfg)
 	return ret;
 }
 
-static int i2c_max32_target_register(const struct device *dev, struct i2c_target_config *cfg)
+static int api_target_register(const struct device *dev, struct i2c_target_config *cfg)
 {
 
 	return 0;
 }
 
-static int i2c_max32_target_unregister(const struct device *dev, struct i2c_target_config *cfg)
+static int api_target_unregister(const struct device *dev, struct i2c_target_config *cfg)
 {
 
 	return 0;
 }
 
 #ifdef CONFIG_I2C_CALLBACK
-static int i2c_max32_transfer_cb(const struct device *dev, struct i2c_msg *msgs, uint8_t num_msgs,
-				 uint16_t addr, i2c_callback_t cb, void *userdata)
+static int api_transfer_cb(const struct device *dev, struct i2c_msg *msgs, uint8_t num_msgs,
+			   uint16_t addr, i2c_callback_t cb, void *userdata)
 {
 
 	return 0;
@@ -87,12 +87,12 @@ static int i2c_max32_transfer_cb(const struct device *dev, struct i2c_msg *msgs,
 #endif /* CONFIG_I2C_CALLBACK */
 
 #if defined(CONFIG_I2C_RTIO)
-static void i2c_max32_iodev_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
+static void api_iodev_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_sqe)
 {
 }
 #endif /* CONFIG_I2C_RTIO */
 
-static int i2c_max32_recover_bus(const struct device *dev)
+static int api_recover_bus(const struct device *dev)
 {
 	int ret;
 	const struct i2c_max32_config *const cfg = dev->config;
@@ -103,8 +103,8 @@ static int i2c_max32_recover_bus(const struct device *dev)
 	return ret;
 }
 
-static int i2c_max32_transfer(const struct device *dev, struct i2c_msg *msgs, uint8_t num_msgs,
-			      uint16_t slave_address)
+static int api_transfer(const struct device *dev, struct i2c_msg *msgs, uint8_t num_msgs,
+			uint16_t slave_address)
 {
 	int ret;
 	const struct i2c_max32_config *const cfg = dev->config;
@@ -147,19 +147,17 @@ static int i2c_max32_transfer(const struct device *dev, struct i2c_msg *msgs, ui
 }
 
 static struct i2c_driver_api api = {
-	.configure = i2c_max32_configure,
-	.transfer = i2c_max32_transfer,
-
-	.target_register = i2c_max32_target_register,
-	.target_unregister = i2c_max32_target_unregister,
-
+	.configure = api_configure,
+	.transfer = api_transfer,
+	.target_register = api_target_register,
+	.target_unregister = api_target_unregister,
 #ifdef CONFIG_I2C_CALLBACK
-	.transfer_cb = i2c_max32_transfer_cb,
+	.transfer_cb = api_transfer_cb,
 #endif
 #ifdef CONFIG_I2C_RTIO
-	.iodev_submit = i2c_max32_iodev_submit,
+	.iodev_submit = api_iodev_submit,
 #endif
-	.recover_bus = i2c_max32_recover_bus,
+	.recover_bus = api_recover_bus,
 };
 
 static int i2c_max32_init(const struct device *dev)
@@ -175,7 +173,7 @@ static int i2c_max32_init(const struct device *dev)
 	MXC_I2C_Shutdown(i2c); /* Clear everything out */
 
 	/* enable clock */
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
 	if (ret) {
 		return ret;
 	}
@@ -194,7 +192,6 @@ static int i2c_max32_init(const struct device *dev)
 
 #define DEFINE_I2C_MAX32(_num)                                                                     \
 	PINCTRL_DT_INST_DEFINE(_num);                                                              \
-                                                                                                   \
 	static const struct i2c_max32_config i2c_max32_dev_cfg_##_num = {                          \
 		.i2c = (mxc_i2c_regs_t *)DT_INST_REG_ADDR(_num),                                   \
 		.pctrl = PINCTRL_DT_INST_DEV_CONFIG_GET(_num),                                     \
@@ -203,7 +200,6 @@ static int i2c_max32_init(const struct device *dev)
 		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
 		.bitrate = DT_INST_PROP(_num, clock_frequency),                                    \
 	};                                                                                         \
-                                                                                                   \
 	I2C_DEVICE_DT_INST_DEFINE(                                                                 \
 		_num, i2c_max32_init, NULL, (mxc_i2c_regs_t *)DT_INST_REG_ADDR(_num),              \
 		&i2c_max32_dev_cfg_##_num, PRE_KERNEL_2, CONFIG_I2C_INIT_PRIORITY, &api);

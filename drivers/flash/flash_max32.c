@@ -20,8 +20,6 @@
 
 #include "flc.h"
 
-#define FLASH_DATA(dev) ((struct max32_flash_dev_data *)((dev)->data))
-
 struct max32_flash_dev_data {
 	struct k_sem sem;
 };
@@ -38,13 +36,14 @@ static int api_read(const struct device *dev, off_t address, void *buffer, size_
 static int api_write(const struct device *dev, off_t address, const void *buffer, size_t length)
 {
 	int ret = 0;
+	struct max32_flash_dev_data *data = dev->data;
 
-	k_sem_take(&FLASH_DATA(dev)->sem, K_FOREVER);
+	k_sem_take(&data->sem, K_FOREVER);
 
 	address += FLASH_BASE;
 	ret = MXC_FLC_Write(address, length, (uint32_t *)buffer);
 
-	k_sem_give(&FLASH_DATA(dev)->sem);
+	k_sem_give(&data->sem);
 
 	return ret;
 }
@@ -52,10 +51,11 @@ static int api_write(const struct device *dev, off_t address, const void *buffer
 static int api_erase(const struct device *dev, off_t start, size_t len)
 {
 	int ret = 0;
+	struct max32_flash_dev_data *data = dev->data;
 	uint32_t page_size = FLASH_ERASE_BLK_SZ;
 	uint32_t addr = (start + FLASH_BASE);
 
-	k_sem_take(&FLASH_DATA(dev)->sem, K_FOREVER);
+	k_sem_take(&data->sem, K_FOREVER);
 
 	while (len) {
 		ret = MXC_FLC_PageErase(addr);
@@ -71,7 +71,7 @@ static int api_erase(const struct device *dev, off_t start, size_t len)
 		}
 	}
 
-	k_sem_give(&FLASH_DATA(dev)->sem);
+	k_sem_give(&data->sem);
 
 	return ret;
 }
@@ -105,11 +105,12 @@ static const struct flash_parameters *api_get_parameters(const struct device *de
 static int flash_max32_init(const struct device *dev)
 {
 	int ret;
+	struct max32_flash_dev_data *data = dev->data;
 
 	ret = MXC_FLC_Init();
 
 	/* Mutex for flash controller */
-	k_sem_init(&FLASH_DATA(dev)->sem, 1, 1);
+	k_sem_init(&data->sem, 1, 1);
 
 	return ret;
 }

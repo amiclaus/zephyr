@@ -21,9 +21,6 @@
 LOG_MODULE_REGISTER(spi_max32_v1, CONFIG_SPI_LOG_LEVEL);
 #include "spi_context.h"
 
-#define SPI_CFG(dev)  ((struct max32_spi_config *)((dev)->config))
-#define SPI_DATA(dev) ((struct max32_spi_data *)((dev)->data))
-
 struct max32_spi_config {
 	mxc_spi_regs_t *regs;
 	const struct pinctrl_dev_config *pctrl;
@@ -39,9 +36,11 @@ struct max32_spi_data {
 static int spi_configure(const struct device *dev, const struct spi_config *config)
 {
 	int ret = 0;
-	mxc_spi_regs_t *regs = SPI_CFG(dev)->regs;
+	const struct max32_spi_config *cfg = dev->config;
+	mxc_spi_regs_t *regs = cfg->regs;
+	struct max32_spi_data *data = dev->data;
 
-	if (spi_context_configured(&SPI_DATA(dev)->ctx, config)) {
+	if (spi_context_configured(&data->ctx, config)) {
 		return 0;
 	}
 
@@ -103,20 +102,21 @@ static int spi_configure(const struct device *dev, const struct spi_config *conf
 	}
 #endif
 
-	SPI_DATA(dev)->ctx.config = config;
+	data->ctx.config = config;
 
 	return ret;
 }
 
-static int spi_max32_transceive(const struct device *dev, const struct spi_config *config,
-				const struct spi_buf_set *tx_bufs,
-				const struct spi_buf_set *rx_bufs)
+static int api_transceive(const struct device *dev, const struct spi_config *config,
+			  const struct spi_buf_set *tx_bufs, const struct spi_buf_set *rx_bufs)
 {
 	int ret = 0;
+	const struct max32_spi_config *cfg = dev->config;
+	struct max32_spi_data *data = dev->data;
 	int i, n = 0;
 	mxc_spi_req_t req;
 	int rx_len = 0;
-	int tx_len = 0;	
+	int tx_len = 0;
 	int nul_rx_len = 0;
 	bool hw_cs_ctrl = true;
 
@@ -125,18 +125,18 @@ static int spi_max32_transceive(const struct device *dev, const struct spi_confi
 		return -EIO;
 	}
 
-	/* Check if CS GPIO exists */ 
+	/* Check if CS GPIO exists */
 	if (spi_cs_is_gpio(config)) {
 		hw_cs_ctrl = false;
 	}
-	MXC_SPI_HWSSControl(SPI_CFG(dev)->regs, hw_cs_ctrl);
+	MXC_SPI_HWSSControl(cfg->regs, hw_cs_ctrl);
 
 	/* Assert the CS line if HW control disabled */
 	if (!hw_cs_ctrl) {
-		spi_context_cs_control(&SPI_DATA(dev)->ctx, true);
+		spi_context_cs_control(&data->ctx, true);
 	}
 
-	req.spi = SPI_CFG(dev)->regs;
+	req.spi = cfg->regs;
 
 	if (tx_bufs) {
 		/* Get total tx length */
@@ -150,7 +150,7 @@ static int spi_max32_transceive(const struct device *dev, const struct spi_confi
 		req.txLen = 0;
 	}
 
-	if (rx_bufs) { 
+	if (rx_bufs) {
 		/* Get total rx length */
 		for (i = 0; i < rx_bufs->count; i++) {
 			rx_len += rx_bufs->buffers[i].len;
@@ -162,7 +162,7 @@ static int spi_max32_transceive(const struct device *dev, const struct spi_confi
 		}
 		/* Ignore nul_rx_len bytes */
 		req.rxData = (uint8_t *)rx_bufs->buffers[n].buf - nul_rx_len;
-		req.rxLen = rx_len; 
+		req.rxLen = rx_len;
 	} else {
 		req.rxData = NULL;
 		req.rxLen = 0;
@@ -182,21 +182,20 @@ static int spi_max32_transceive(const struct device *dev, const struct spi_confi
 	req.txCnt = 0;
 	req.rxCnt = 0;
 
-	ret = MXC_SPI_MasterTransaction(&req); 
-
- 	if (ret) {
+	ret = MXC_SPI_MasterTransaction(&req);
+	if (ret) {
 		ret = -EIO;
 	}
 
 	/* Deassert the CS line if hw control disabled */
 	if (!hw_cs_ctrl) {
-		spi_context_cs_control(&SPI_DATA(dev)->ctx, false);
+		spi_context_cs_control(&data->ctx, false);
 	}
 
 	return ret;
 }
 
-static int spi_max32_release(const struct device *dev, const struct spi_config *config)
+static int api_release(const struct device *dev, const struct spi_config *config)
 {
 	return 0;
 }
@@ -207,6 +206,7 @@ static int spi_max32_init(const struct device *dev)
 	int ret = 0;
 	const struct max32_spi_config *const cfg = dev->config;
 	mxc_spi_regs_t *regs = cfg->regs;
+	struct max32_spi_data *data = dev->data;
 
 	if (!device_is_ready(cfg->clock)) {
 		return -ENODEV;
@@ -215,7 +215,7 @@ static int spi_max32_init(const struct device *dev)
 	MXC_SPI_Shutdown(regs);
 
 	/* enable clock */
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
 	if (ret) {
 		return ret;
 	}
@@ -225,7 +225,7 @@ static int spi_max32_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = spi_context_cs_configure_all(&SPI_DATA(dev)->ctx);
+	ret = spi_context_cs_configure_all(&data->ctx);
 	if (ret < 0) {
 		return ret;
 	}
@@ -235,8 +235,8 @@ static int spi_max32_init(const struct device *dev)
 
 /* SPI driver APIs structure */
 static struct spi_driver_api spi_max32_api = {
-	.transceive = spi_max32_transceive,
-	.release = spi_max32_release,
+	.transceive = api_transceive,
+	.release = api_release,
 };
 
 /* SPI driver registration */
