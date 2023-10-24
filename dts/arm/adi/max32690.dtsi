@@ -211,6 +211,39 @@
 			status = "disabled";
 		};
 
+		i2c0: i2c0@4001d000 {
+			compatible = "adi,max32-i2c";
+			reg = <0x4001d000 0xfff>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <I2C_BITRATE_STANDARD>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 13>;
+			interrupts = <13 0>;
+			status = "disabled";
+		};
+
+		i2c1: i2c0@4001e000 {
+			compatible = "adi,max32-i2c";
+			reg = <0x4001e000 0xfff>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <I2C_BITRATE_STANDARD>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 28>;
+			interrupts = <36 0>;
+			status = "disabled";
+		};
+
+		i2c2: i2c0@4001f000 {
+			compatible = "adi,max32-i2c";
+			reg = <0x4001f000 0xfff>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clock-frequency = <I2C_BITRATE_STANDARD>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 24>;
+			interrupts = <62 0>;
+			status = "disabled";
+		};
+
 		spi0: spi@40046000 {
 			compatible = "adi,max32-spi";
 			reg = <0x40046000 0xfff>;
