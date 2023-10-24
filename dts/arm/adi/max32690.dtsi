@@ -211,7 +211,7 @@
 			status = "disabled";
 		};
 
-		i2c0: i2c0@4001d000 {
+		i2c0: i2c@4001d000 {
 			compatible = "adi,max32-i2c";
 			reg = <0x4001d000 0xfff>;
 			#address-cells = <1>;
@@ -222,7 +222,7 @@
 			status = "disabled";
 		};
 
-		i2c1: i2c0@4001e000 {
+		i2c1: i2c@4001e000 {
 			compatible = "adi,max32-i2c";
 			reg = <0x4001e000 0xfff>;
 			#address-cells = <1>;
@@ -233,7 +233,7 @@
 			status = "disabled";
 		};
 
-		i2c2: i2c0@4001f000 {
+		i2c2: i2c@4001f000 {
 			compatible = "adi,max32-i2c";
 			reg = <0x4001f000 0xfff>;
 			#address-cells = <1>;
