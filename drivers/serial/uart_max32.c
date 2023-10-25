@@ -84,8 +84,6 @@ static int api_err_check(const struct device *dev)
 
 #ifdef CONFIG_UART_USE_RUNTIME_CONFIGURE
 
-#define CONVERT_TO_MXC_DATABITS(x) (x + 5)
-
 static int api_configure(const struct device *dev, const struct uart_config *uart_cfg)
 {
 	int err;
@@ -151,8 +149,11 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 
 	/*
 	 *  Set data bit
+	 *  Valid data for MAX32  is 5-6-7-8
+	 *  Valid data for Zepyhr is 0-1-2-3
+	 *  Added +5 to index match.
 	 */
-	err = MXC_UART_SetDataSize(regs, CONVERT_TO_MXC_DATABITS(uart_cfg->data_bits));
+	err = MXC_UART_SetDataSize(regs, (5 + uart_cfg->data_bits));
 	if (err < 0) {
 		return -ENOTSUP;
 	}
@@ -160,8 +161,13 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 	uart_priv_data->conf.data_bits = uart_cfg->data_bits;
 
 	/*
-	 *  TODO: Set flow control
+	 *  Set flow control
+	 *  Flow control not implemented yet so that only support no flow mode
 	 */
+	if (uart_cfg->flow_ctrl != UART_CFG_FLOW_CTRL_NONE) {
+		return -ENOTSUP;
+	}
+	uart_priv_data->conf.flow_ctrl = uart_cfg->flow_ctrl;
 
 	/*
 	 *  Set frequency

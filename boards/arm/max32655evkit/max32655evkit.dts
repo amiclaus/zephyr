@@ -43,6 +43,10 @@
 			 gpios = <&gpio0 19 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 			 label = "SW3";
 		 };
+		 pb_wakeup: pb_wakeup {
+			gpios = <&gpio3 1 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Wakeup";
+		};
 	 };
 
 	 /* These aliases are provided for compatibility with samples */
@@ -107,6 +111,14 @@
 };
 
 &gpio1 {
+	status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+};
+
+&gpio3 {
 	status = "okay";
 };
 
