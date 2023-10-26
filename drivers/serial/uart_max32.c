@@ -94,58 +94,62 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 	/*
 	 *  Set parity
 	 */
-	mxc_uart_parity_t mxc_parity;
+	if (uart_priv_data->conf.parity != uart_cfg->parity) {
+		mxc_uart_parity_t mxc_parity;
 
-	switch (uart_cfg->parity) {
-	case UART_CFG_PARITY_NONE:
-		mxc_parity = ADI_MAX32_UART_CFG_PARITY_NONE;
-		break;
-	case UART_CFG_PARITY_ODD:
-		mxc_parity = ADI_MAX32_UART_CFG_PARITY_ODD;
-		break;
-	case UART_CFG_PARITY_EVEN:
-		mxc_parity = ADI_MAX32_UART_CFG_PARITY_EVEN;
-		break;
-	case UART_CFG_PARITY_MARK:
+		switch (uart_cfg->parity) {
+		case UART_CFG_PARITY_NONE:
+			mxc_parity = ADI_MAX32_UART_CFG_PARITY_NONE;
+			break;
+		case UART_CFG_PARITY_ODD:
+			mxc_parity = ADI_MAX32_UART_CFG_PARITY_ODD;
+			break;
+		case UART_CFG_PARITY_EVEN:
+			mxc_parity = ADI_MAX32_UART_CFG_PARITY_EVEN;
+			break;
+		case UART_CFG_PARITY_MARK:
 #if defined(CONFIG_SERIAL_SUPPORT_PARITY_MARK)
-		mxc_parity = ADI_MAX32_UART_CFG_PARITY_MARK;
-		break;
+			mxc_parity = ADI_MAX32_UART_CFG_PARITY_MARK;
+			break;
 #else
-		return -ENOTSUP;
+			return -ENOTSUP;
 #endif
-	case UART_CFG_PARITY_SPACE:
+		case UART_CFG_PARITY_SPACE:
 #if defined(CONFIG_SERIAL_SUPPORT_PARITY_SPACE)
-		mxc_parity = ADI_MAX32_UART_CFG_PARITY_SPACE;
-		break;
+			mxc_parity = ADI_MAX32_UART_CFG_PARITY_SPACE;
+			break;
 #else
-		return -ENOTSUP;
+			return -ENOTSUP;
 #endif
-	default:
-		return -EINVAL;
-	}
+		default:
+			return -EINVAL;
+		}
 
-	err = MXC_UART_SetParity(regs, mxc_parity);
-	if (err < 0) {
-		return -ENOTSUP;
+		err = MXC_UART_SetParity(regs, mxc_parity);
+		if (err < 0) {
+			return -ENOTSUP;
+		}
+		/* incase of success keep configuration */
+		uart_priv_data->conf.parity = uart_cfg->parity;
 	}
-	/* incase of success keep configuration */
-	uart_priv_data->conf.parity = uart_cfg->parity;
 
 	/*
 	 *  Set stop bit
 	 */
-	if (uart_cfg->stop_bits == UART_CFG_STOP_BITS_1) {
-		err = MXC_UART_SetStopBits(regs, MXC_UART_STOP_1);
-	} else if (uart_cfg->stop_bits == UART_CFG_STOP_BITS_2) {
-		err = MXC_UART_SetStopBits(regs, MXC_UART_STOP_2);
-	} else {
-		return -ENOTSUP;
+	if (uart_priv_data->conf.stop_bits != uart_cfg->stop_bits) {
+		if (uart_cfg->stop_bits == UART_CFG_STOP_BITS_1) {
+			err = MXC_UART_SetStopBits(regs, MXC_UART_STOP_1);
+		} else if (uart_cfg->stop_bits == UART_CFG_STOP_BITS_2) {
+			err = MXC_UART_SetStopBits(regs, MXC_UART_STOP_2);
+		} else {
+			return -ENOTSUP;
+		}
+		if (err < 0) {
+			return -ENOTSUP;
+		}
+		/* incase of success keep configuration */
+		uart_priv_data->conf.stop_bits = uart_cfg->stop_bits;
 	}
-	if (err < 0) {
-		return -ENOTSUP;
-	}
-	/* incase of success keep configuration */
-	uart_priv_data->conf.stop_bits = uart_cfg->stop_bits;
 
 	/*
 	 *  Set data bit
@@ -153,33 +157,37 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 	 *  Valid data for Zepyhr is 0-1-2-3
 	 *  Added +5 to index match.
 	 */
-	err = MXC_UART_SetDataSize(regs, (5 + uart_cfg->data_bits));
-	if (err < 0) {
-		return -ENOTSUP;
+	if (uart_priv_data->conf.data_bits != uart_cfg->data_bits) {
+		err = MXC_UART_SetDataSize(regs, (5 + uart_cfg->data_bits));
+		if (err < 0) {
+			return -ENOTSUP;
+		}
+		/* incase of success keep configuration */
+		uart_priv_data->conf.data_bits = uart_cfg->data_bits;
 	}
-	/* incase of success keep configuration */
-	uart_priv_data->conf.data_bits = uart_cfg->data_bits;
 
 	/*
 	 *  Set flow control
 	 *  Flow control not implemented yet so that only support no flow mode
 	 */
-	if (uart_cfg->flow_ctrl != UART_CFG_FLOW_CTRL_NONE) {
-		return -ENOTSUP;
+	if (uart_priv_data->conf.flow_ctrl != uart_cfg->flow_ctrl) {
+		if (uart_cfg->flow_ctrl != UART_CFG_FLOW_CTRL_NONE) {
+			return -ENOTSUP;
+		}
+		uart_priv_data->conf.flow_ctrl = uart_cfg->flow_ctrl;
 	}
-	uart_priv_data->conf.flow_ctrl = uart_cfg->flow_ctrl;
 
 	/*
 	 *  Set frequency
 	 */
-	err = Wrap_MXC_UART_SetFrequency(regs, uart_cfg->baudrate, cfg->clock_source);
-	if (err < 0) {
-		return -ENOTSUP;
+	if (uart_priv_data->conf.baudrate != uart_cfg->baudrate) {
+		err = Wrap_MXC_UART_SetFrequency(regs, uart_cfg->baudrate, cfg->clock_source);
+		if (err < 0) {
+			return -ENOTSUP;
+		}
+		/* incase of success keep configuration */
+		uart_priv_data->conf.baudrate = uart_cfg->baudrate;
 	}
-
-	/* incase of success keep configuration */
-	uart_priv_data->conf.baudrate = uart_cfg->baudrate;
-
 	return 0;
 }
 
@@ -200,7 +208,6 @@ static int uart_max32_init(const struct device *dev)
 	int ret;
 	const struct max32_uart_config *const cfg = dev->config;
 	mxc_uart_regs_t *regs = cfg->regs;
-	struct max32_uart_data *uart_priv_data = (struct max32_uart_data *)(dev->data);
 
 	if (!device_is_ready(cfg->clock)) {
 		LOG_ERR("clock control device not ready");
@@ -223,17 +230,19 @@ static int uart_max32_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = Wrap_MXC_UART_Init(regs, cfg->uart_conf.baudrate, cfg->clock_source);
+	ret = api_configure(dev, &cfg->uart_conf);
 	if (ret) {
 		return ret;
 	}
 
-	/* store configuration at the global */
-	uart_priv_data->conf = cfg->uart_conf;
+	ret = Wrap_MXC_UART_Init(regs);
+	if (ret) {
+		return ret;
+	}
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 	/* Clear any pending UART RX/TX interrupts */
-	MXC_UART_ClearFlags(regs, (ADI_MAX32_UART_INT_TX | ADI_MAX32_UART_INT_TX));
+	MXC_UART_ClearFlags(regs, (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
 	cfg->irq_config_func(dev);
 #endif
 
@@ -471,6 +480,9 @@ static const struct uart_driver_api uart_max32_driver_api = {
 		.uart_conf.baudrate = DT_INST_PROP(_num, current_speed),                           \
 		.uart_conf.parity = DT_INST_ENUM_IDX_OR(_num, parity, UART_CFG_PARITY_NONE),       \
 		.uart_conf.data_bits = DT_INST_ENUM_IDX(_num, data_bits),                          \
+		.uart_conf.stop_bits = DT_INST_ENUM_IDX_OR(_num, stop_bits, UART_CFG_STOP_BITS_1), \
+		.uart_conf.flow_ctrl =                                                             \
+			DT_INST_PROP_OR(index, hw_flow_control, UART_CFG_FLOW_CTRL_NONE),          \
 		IF_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN,                                           \
 			   (.irq_config_func = uart_max32_irq_init_##_num, ))};                    \
 	static struct max32_uart_data max32_uart_data##_num = {                                    \
