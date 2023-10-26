@@ -207,6 +207,11 @@ static int api_pin_interrupt_configure(const struct device *dev, gpio_pin_t pin,
 
 	if (mode == GPIO_INT_MODE_DISABLED) {
 		MXC_GPIO_DisableInt(cfg->regs, gpio_cfg.mask);
+
+		/* clear interrupt flags */
+		unsigned int flags = MXC_GPIO_GetFlags(cfg->regs);
+		MXC_GPIO_ClearFlags(cfg->regs, (flags & gpio_cfg.mask));
+
 		return 0;
 	}
 
