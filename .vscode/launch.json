@@ -14,24 +14,24 @@
 
             "configFiles": [ 
                     "interface/cmsis-dap.cfg",
-                    "target/max32665.cfg" ], 
+                    "target/max32655.cfg" ], 
 
             // Your OpenOCD Path if not in env:Path
             "serverpath": "openocd.exe",
 
             // Your search dir here
-            //"searchDir": ["C:/Maxim/Toolchain/share/openocd/scripts"], // Default LPSDK path
             "searchDir": ["C:/MaximSDK/Tools/OpenOCD/scripts"], // Default MSDK path
 
             // Or this for attaching remote debug server
             //"debugServer": 3333,
             "serverArgs": ["-c", "bindto 0.0.0.0"], 
             // Your gdb path
-            "gdbPath": "arm-none-eabi-gdb.exe",
+            "gdbPath": "C:\\MaximSDK\\Tools\\GNUTools\\10.3\\bin\\arm-none-eabi-gdb.exe",
+            //
+            "runToEntryPoint": "main",
 
             "interface": "swd",
-            //"svdFile": "${workspaceRoot}/lib/msdk/CMSIS/Device/Maxim/MAX32665/Include/max32665.svd",
-                
+            "svdFile": "${workspaceRoot}/../modules/hal/adi/MAX/Libraries/CMSIS/Device/Maxim/MAX32655/Include/max32655.svd",
         },
         {
             "name": "(J-Link gdb-remote) Debug",
