@@ -267,6 +267,9 @@ static int api_fifo_read(const struct device *dev, uint8_t *rx_data, const int s
 	const struct max32_uart_config *cfg = dev->config;
 
 	num_rx = MXC_UART_ReadRXFIFO(cfg->regs, (unsigned char *)rx_data, size);
+	if (num_rx == 0) {
+		MXC_UART_ClearFlags(cfg->regs, ADI_MAX32_UART_INT_RX);
+	}
 
 	return num_rx;
 }
