@@ -347,7 +347,6 @@
 			reg = <0x40003000 0x400>;
 			interrupts = <1 0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 27>;
-			clock-source = <0>;
 			status = "disabled";
 		};
 
@@ -356,7 +355,6 @@
 			reg = <0x40003400 0x400>;
 			interrupts = <57 0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 28>;
-			clock-source = <0>;
 			status = "disabled";
 		};
 
@@ -365,7 +363,6 @@
 			reg = <0x40003800 0x400>;
 			interrupts = <81 0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 29>;
-			clock-source = <0>;
 			status = "disabled";
 		};
 

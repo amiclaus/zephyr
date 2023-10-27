@@ -321,7 +321,7 @@
 			reg = <0x40003000 0x400>;
 			interrupts = <1 0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 27>;
-			clock-source = <0>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_PCLK>;
 			status = "disabled";
 		};
 
@@ -330,7 +330,7 @@
 			reg = <0x40080800 0x400>;
 			interrupts = <57 0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS2 1>;
-			clock-source = <2>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_IBRO>;
 			status = "disabled";
 		};
 
