@@ -209,8 +209,7 @@ static int api_pin_interrupt_configure(const struct device *dev, gpio_pin_t pin,
 		MXC_GPIO_DisableInt(cfg->regs, gpio_cfg.mask);
 
 		/* clear interrupt flags */
-		unsigned int flags = MXC_GPIO_GetFlags(cfg->regs);
-		MXC_GPIO_ClearFlags(cfg->regs, (flags & gpio_cfg.mask));
+		MXC_GPIO_ClearFlags(cfg->regs, (MXC_GPIO_GetFlags(cfg->regs) & gpio_cfg.mask));
 
 		return 0;
 	}
@@ -280,11 +279,12 @@ static void gpio_max32_isr(const void *param)
 
 static int gpio_max32_init(const struct device *dev)
 {
+	int ret = 0;
 	const struct max32_gpio_config *cfg = dev->config;
 
 	if (cfg->clock != NULL) {
 		/* enable clock */
-		int ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
+		ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
 		if (ret != 0) {
 			LOG_ERR("cannot enable GPIO clock");
 			return ret;
@@ -293,7 +293,7 @@ static int gpio_max32_init(const struct device *dev)
 
 	cfg->irq_func();
 
-	return 0;
+	return ret;
 }
 
 #define MAX32_GPIO_INIT(_num)                                                                      \

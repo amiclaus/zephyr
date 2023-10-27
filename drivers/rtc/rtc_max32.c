@@ -371,8 +371,12 @@ static int api_get_calibration(const struct device *dev, int32_t *calibration)
 
 static void rtc_max32_isr(const struct device *dev)
 {
+#if defined(CONFIG_RTC_ALARM) || (CONFIG_RTC_UPDATE)
 	struct max32_rtc_data *const data = dev->data;
 	int flags = MXC_RTC_GetFlags();
+#else
+	ARG_UNUSED(dev);
+#endif
 
 #ifdef CONFIG_RTC_ALARM
 	if (flags & MXC_RTC_INT_FL_LONG) {
