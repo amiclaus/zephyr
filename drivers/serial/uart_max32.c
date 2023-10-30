@@ -108,14 +108,14 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 			mxc_parity = ADI_MAX32_UART_CFG_PARITY_EVEN;
 			break;
 		case UART_CFG_PARITY_MARK:
-#if defined(CONFIG_SERIAL_SUPPORT_PARITY_MARK)
+#if defined(ADI_MAX32_UART_CFG_PARITY_MARK)
 			mxc_parity = ADI_MAX32_UART_CFG_PARITY_MARK;
 			break;
 #else
 			return -ENOTSUP;
 #endif
 		case UART_CFG_PARITY_SPACE:
-#if defined(CONFIG_SERIAL_SUPPORT_PARITY_SPACE)
+#if defined(ADI_MAX32_UART_CFG_PARITY_SPACE)
 			mxc_parity = ADI_MAX32_UART_CFG_PARITY_SPACE;
 			break;
 #else
