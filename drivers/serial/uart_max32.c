@@ -5,6 +5,9 @@
  */
 
 #include <zephyr/drivers/clock_control.h>
+#if CONFIG_UART_ASYNC_API
+#include <zephyr/drivers/dma.h>
+#endif
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/kernel.h>
@@ -17,6 +20,14 @@
 
 LOG_MODULE_REGISTER(uart_max32, CONFIG_UART_LOG_LEVEL);
 
+#ifdef CONFIG_UART_ASYNC_API
+struct max32_uart_dma_config {
+	const struct device *dev;
+	const uint32_t channel;
+	const uint32_t slot;
+};
+#endif /* CONFIG_UART_ASYNC_API */
+
 struct max32_uart_config {
 	mxc_uart_regs_t *regs;
 	int clock_source;
@@ -24,15 +35,49 @@ struct max32_uart_config {
 	const struct device *clock;
 	struct max32_perclk perclk;
 	struct uart_config uart_conf;
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
+#if CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API
 	uart_irq_config_func_t irq_config_func;
-#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+#endif /* CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API */
+#ifdef CONFIG_UART_ASYNC_API
+	const struct max32_uart_dma_config tx_dma;
+	const struct max32_uart_dma_config rx_dma;
+#endif /* CONFIG_UART_ASYNC_API */
 };
+
+#if CONFIG_UART_ASYNC_API
+struct max32_uart_async_tx {
+	const uint8_t *buf;
+	size_t len;
+	struct k_work_delayable timeout_work;
+};
+struct max32_uart_async_rx {
+	uint8_t *buf;
+	size_t len;
+	size_t offset;
+	size_t counter;
+	uint8_t *next_buf;
+	size_t next_len;
+	int32_t timeout;
+	struct k_work_delayable timeout_work;
+};
+
+struct max32_uart_async_data {
+	const struct device *uart_dev;
+	struct max32_uart_async_tx tx;
+	struct max32_uart_async_rx rx;
+	uart_callback_t cb;
+	void *user_data;
+};
+#endif
 
 struct max32_uart_data {
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	uart_irq_callback_user_data_t cb; /* Interrupt Callback */
-	void *cb_data;                    /* Interrupt Callback Arg */
+	uart_irq_callback_user_data_t cb; /* Interrupt callback */
+	void *cb_data;                    /* Interrupt callback arg */
+	uint32_t flags;                   /* Cached interrupt flags */
+#endif
+#if CONFIG_UART_ASYNC_API
+	struct max32_uart_async_data async;
 #endif
 	struct uart_config conf; /* baudrate, stopbits, ... */
 };
@@ -89,12 +134,12 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 	int err;
 	const struct max32_uart_config *const cfg = dev->config;
 	mxc_uart_regs_t *regs = cfg->regs;
-	struct max32_uart_data *uart_priv_data = (struct max32_uart_data *)(dev->data);
+	struct max32_uart_data *data = dev->data;
 
 	/*
 	 *  Set parity
 	 */
-	if (uart_priv_data->conf.parity != uart_cfg->parity) {
+	if (data->conf.parity != uart_cfg->parity) {
 		mxc_uart_parity_t mxc_parity;
 
 		switch (uart_cfg->parity) {
@@ -130,13 +175,13 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 			return -ENOTSUP;
 		}
 		/* incase of success keep configuration */
-		uart_priv_data->conf.parity = uart_cfg->parity;
+		data->conf.parity = uart_cfg->parity;
 	}
 
 	/*
 	 *  Set stop bit
 	 */
-	if (uart_priv_data->conf.stop_bits != uart_cfg->stop_bits) {
+	if (data->conf.stop_bits != uart_cfg->stop_bits) {
 		if (uart_cfg->stop_bits == UART_CFG_STOP_BITS_1) {
 			err = MXC_UART_SetStopBits(regs, MXC_UART_STOP_1);
 		} else if (uart_cfg->stop_bits == UART_CFG_STOP_BITS_2) {
@@ -148,7 +193,7 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 			return -ENOTSUP;
 		}
 		/* incase of success keep configuration */
-		uart_priv_data->conf.stop_bits = uart_cfg->stop_bits;
+		data->conf.stop_bits = uart_cfg->stop_bits;
 	}
 
 	/*
@@ -157,97 +202,51 @@ static int api_configure(const struct device *dev, const struct uart_config *uar
 	 *  Valid data for Zepyhr is 0-1-2-3
 	 *  Added +5 to index match.
 	 */
-	if (uart_priv_data->conf.data_bits != uart_cfg->data_bits) {
+	if (data->conf.data_bits != uart_cfg->data_bits) {
 		err = MXC_UART_SetDataSize(regs, (5 + uart_cfg->data_bits));
 		if (err < 0) {
 			return -ENOTSUP;
 		}
 		/* incase of success keep configuration */
-		uart_priv_data->conf.data_bits = uart_cfg->data_bits;
+		data->conf.data_bits = uart_cfg->data_bits;
 	}
 
 	/*
 	 *  Set flow control
 	 *  Flow control not implemented yet so that only support no flow mode
 	 */
-	if (uart_priv_data->conf.flow_ctrl != uart_cfg->flow_ctrl) {
+	if (data->conf.flow_ctrl != uart_cfg->flow_ctrl) {
 		if (uart_cfg->flow_ctrl != UART_CFG_FLOW_CTRL_NONE) {
 			return -ENOTSUP;
 		}
-		uart_priv_data->conf.flow_ctrl = uart_cfg->flow_ctrl;
+		data->conf.flow_ctrl = uart_cfg->flow_ctrl;
 	}
 
 	/*
-	 *  Set frequency
+	 *  Set baudrate
 	 */
-	if (uart_priv_data->conf.baudrate != uart_cfg->baudrate) {
+	if (data->conf.baudrate != uart_cfg->baudrate) {
 		err = Wrap_MXC_UART_SetFrequency(regs, uart_cfg->baudrate, cfg->clock_source);
 		if (err < 0) {
 			return -ENOTSUP;
 		}
-		/* incase of success keep configuration */
-		uart_priv_data->conf.baudrate = uart_cfg->baudrate;
+		/* In case of success keep configuration */
+		data->conf.baudrate = uart_cfg->baudrate;
 	}
 	return 0;
 }
 
 static int api_config_get(const struct device *dev, struct uart_config *uart_cfg)
 {
-	struct max32_uart_data *uart_priv_data = (struct max32_uart_data *)(dev->data);
+	struct max32_uart_data *data = dev->data;
 
 	/* copy configs from global setting */
-	*uart_cfg = uart_priv_data->conf;
+	*uart_cfg = data->conf;
 
 	return 0;
 }
 
 #endif /* CONFIG_UART_USE_RUNTIME_CONFIGURE */
-
-static int uart_max32_init(const struct device *dev)
-{
-	int ret;
-	const struct max32_uart_config *const cfg = dev->config;
-	mxc_uart_regs_t *regs = cfg->regs;
-
-	if (!device_is_ready(cfg->clock)) {
-		LOG_ERR("clock control device not ready");
-		return -ENODEV;
-	}
-
-	ret = MXC_UART_Shutdown(regs);
-	if (ret) {
-		return ret;
-	}
-
-	ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
-	if (ret != 0) {
-		LOG_ERR("cannot enable UART clock");
-		return ret;
-	}
-
-	ret = pinctrl_apply_state(cfg->pctrl, PINCTRL_STATE_DEFAULT);
-	if (ret) {
-		return ret;
-	}
-
-	ret = api_configure(dev, &cfg->uart_conf);
-	if (ret) {
-		return ret;
-	}
-
-	ret = Wrap_MXC_UART_Init(regs);
-	if (ret) {
-		return ret;
-	}
-
-#ifdef CONFIG_UART_INTERRUPT_DRIVEN
-	/* Clear any pending UART RX/TX interrupts */
-	MXC_UART_ClearFlags(regs, (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
-	cfg->irq_config_func(dev);
-#endif
-
-	return ret;
-}
 
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 
@@ -290,23 +289,9 @@ static void api_irq_tx_disable(const struct device *dev)
 
 static int api_irq_tx_ready(const struct device *dev)
 {
-	const struct max32_uart_config *cfg = dev->config;
+	struct max32_uart_data *const data = dev->data;
 
-	return (MXC_UART_GetFlags(cfg->regs) & ADI_MAX32_UART_INT_TX);
-}
-
-static void api_irq_rx_enable(const struct device *dev)
-{
-	const struct max32_uart_config *cfg = dev->config;
-
-	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
-}
-
-static void api_irq_rx_disable(const struct device *dev)
-{
-	const struct max32_uart_config *cfg = dev->config;
-
-	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
+	return (data->flags & ADI_MAX32_UART_INT_TX);
 }
 
 static int api_irq_tx_complete(const struct device *dev)
@@ -322,9 +307,9 @@ static int api_irq_tx_complete(const struct device *dev)
 
 static int api_irq_rx_ready(const struct device *dev)
 {
-	const struct max32_uart_config *cfg = dev->config;
+	struct max32_uart_data *const data = dev->data;
 
-	return (MXC_UART_GetFlags(cfg->regs) & ADI_MAX32_UART_INT_RX);
+	return (data->flags & ADI_MAX32_UART_INT_RX);
 }
 
 static void api_irq_err_enable(const struct device *dev)
@@ -343,91 +328,521 @@ static void api_irq_err_disable(const struct device *dev)
 
 static int api_irq_is_pending(const struct device *dev)
 {
-	const struct max32_uart_config *cfg = dev->config;
+	struct max32_uart_data *const data = dev->data;
 
-	return (MXC_UART_GetFlags(cfg->regs) & (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
+	return (data->flags & (ADI_MAX32_UART_INT_RX | ADI_MAX32_UART_INT_TX));
 }
 
 static int api_irq_update(const struct device *dev)
 {
+	struct max32_uart_data *const data = dev->data;
+	const struct max32_uart_config *const cfg = dev->config;
+
+	data->flags = MXC_UART_GetFlags(cfg->regs);
+
+	MXC_UART_ClearFlags(cfg->regs, data->flags);
+
 	return 1;
 }
 
 static void api_irq_callback_set(const struct device *dev, uart_irq_callback_user_data_t cb,
 				 void *cb_data)
 {
-	struct max32_uart_data *const dev_data = (struct max32_uart_data *)(dev->data);
+	struct max32_uart_data *const dev_data = dev->data;
 
 	dev_data->cb = cb;
 	dev_data->cb_data = cb_data;
 }
 
+#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+
+#if CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API
+static void api_irq_rx_enable(const struct device *dev)
+{
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_EnableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
+}
+
+static void api_irq_rx_disable(const struct device *dev)
+{
+	const struct max32_uart_config *cfg = dev->config;
+
+	MXC_UART_DisableInt(cfg->regs, ADI_MAX32_UART_INT_RX);
+}
+
 static void uart_max32_isr(const struct device *dev)
 {
 	const struct max32_uart_config *const cfg = dev->config;
-	struct max32_uart_data *dev_data = (struct max32_uart_data *)(dev->data);
+	struct max32_uart_data *data = dev->data;
 	unsigned int int_status;
 
 	int_status = MXC_UART_GetFlags(cfg->regs);
 
-	if (dev_data->cb) {
-		dev_data->cb(dev, dev_data->cb_data);
+#if CONFIG_UART_INTERRUPT_DRIVEN
+	if (data->cb) {
+		data->cb(dev, data->cb_data);
 	}
-
-	/* Clear RX/TX interrupts flag after cb called */
-	MXC_UART_ClearFlags(cfg->regs, int_status);
-}
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 
-#ifdef CONFIG_UART_ASYNC_API
+#if CONFIG_UART_ASYNC_API
+	if (data->async.rx.timeout != SYS_FOREVER_US && data->async.rx.timeout != 0 &&
+	    (int_status & ADI_MAX32_UART_INT_RX)) {
+		k_work_reschedule(&data->async.rx.timeout_work, K_USEC(data->async.rx.timeout));
+	}
+#endif /* CONFIG_UART_ASYNC_API */
+
+	/* Clear RX/TX interrupts flag after cb is called */
+	MXC_UART_ClearFlags(cfg->regs, int_status);
+}
+#endif /* CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API */
+
+#if defined(CONFIG_UART_ASYNC_API)
+
+static inline void async_timer_start(struct k_work_delayable *work, int32_t timeout)
+{
+	if ((timeout != SYS_FOREVER_US) && (timeout != 0)) {
+		k_work_reschedule(work, K_USEC(timeout));
+	}
+}
+
+static void async_user_callback(const struct device *dev, struct uart_event *evt)
+{
+	const struct max32_uart_data *data = dev->data;
+
+	if (data->async.cb) {
+		data->async.cb(dev, evt, data->async.user_data);
+	}
+}
+
+static void uart_max32_async_tx_callback(const struct device *dma_dev, void *user_data,
+					 uint32_t channel, int status)
+{
+	const struct device *dev = user_data;
+	const struct max32_uart_config *config = dev->config;
+	struct max32_uart_data *data = dev->data;
+	struct dma_status dma_status;
+
+	unsigned int key = irq_lock();
+
+	dma_get_status(config->tx_dma.dev, config->tx_dma.channel, &dma_status);
+	/* Skip callback if channel is still busy */
+	if (dma_status.busy) {
+		irq_unlock(key);
+		return;
+	}
+
+	k_work_cancel_delayable(&data->async.tx.timeout_work);
+	Wrap_MXC_UART_DisableTxDMA(config->regs);
+	struct uart_event tx_done = {
+		.type = status == 0 ? UART_TX_DONE : UART_TX_ABORTED,
+		.data.tx.buf = data->async.tx.buf,
+		.data.tx.len = data->async.tx.len,
+	};
+	async_user_callback(dev, &tx_done);
+
+	irq_unlock(key);
+}
 
 static int api_callback_set(const struct device *dev, uart_callback_t callback, void *user_data)
 {
-	ARG_UNUSED(dev);
-	ARG_UNUSED(callback);
-	ARG_UNUSED(user_data);
+	struct max32_uart_data *data = dev->data;
+
+	data->async.cb = callback;
+	data->async.user_data = user_data;
+
 	return 0;
 }
 
 static int api_tx(const struct device *dev, const uint8_t *buf, size_t len, int32_t timeout)
 {
-	ARG_UNUSED(dev);
-	ARG_UNUSED(buf);
-	ARG_UNUSED(len);
-	ARG_UNUSED(timeout);
-	return 0;
+	struct max32_uart_data *data = dev->data;
+	const struct max32_uart_config *config = dev->config;
+	struct dma_status status;
+	struct dma_config dma_cfg = {0};
+	struct dma_block_config dma_blk = {0};
+	int ret;
+	unsigned int key = irq_lock();
+
+	if (config->tx_dma.channel == 0xFF) {
+		LOG_ERR("Tx DMA channel is not configured");
+		irq_unlock(key);
+		return -ENOTSUP;
+	}
+
+	ret = dma_get_status(config->tx_dma.dev, config->tx_dma.channel, &status);
+	if (ret < 0 || status.busy) {
+		LOG_ERR("DMA Tx %s", ret < 0 ? "error" : "busy");
+		irq_unlock(key);
+		return ret < 0 ? ret : -EBUSY;
+	}
+
+	data->async.tx.buf = buf;
+	data->async.tx.len = len;
+
+	dma_cfg.channel_direction = MEMORY_TO_PERIPHERAL;
+	dma_cfg.dma_callback = uart_max32_async_tx_callback;
+	dma_cfg.user_data = (void *)dev;
+	dma_cfg.dma_slot = config->tx_dma.slot;
+	dma_cfg.block_count = 1;
+	dma_cfg.source_data_size = 1U;
+	dma_cfg.source_burst_length = 1U;
+	dma_cfg.dest_data_size = 1U;
+	dma_cfg.head_block = &dma_blk;
+	dma_blk.block_size = len;
+	dma_blk.source_address = (uint32_t)buf;
+
+	ret = dma_config(config->tx_dma.dev, config->tx_dma.channel, &dma_cfg);
+	if (ret < 0) {
+		LOG_ERR("Error configuring Tx DMA (%d)", ret);
+		irq_unlock(key);
+		return ret;
+	}
+
+	ret = dma_start(config->tx_dma.dev, config->tx_dma.channel);
+	if (ret < 0) {
+		LOG_ERR("Error starting Tx DMA (%d)", ret);
+		irq_unlock(key);
+		return ret;
+	}
+
+	async_timer_start(&data->async.tx.timeout_work, timeout);
+
+	Wrap_MXC_UART_SetTxDMALevel(config->regs, 2);
+	Wrap_MXC_UART_EnableTxDMA(config->regs);
+
+	irq_unlock(key);
+
+	return ret;
 }
 
 static int api_tx_abort(const struct device *dev)
 {
-	ARG_UNUSED(dev);
+	int ret;
+	struct max32_uart_data *data = dev->data;
+	const struct max32_uart_config *config = dev->config;
+	struct dma_status status;
+	size_t bytes_sent;
+
+	unsigned int key = irq_lock();
+
+	k_work_cancel_delayable(&data->async.tx.timeout_work);
+
+	Wrap_MXC_UART_DisableTxDMA(config->regs);
+
+	ret = dma_get_status(config->tx_dma.dev, config->tx_dma.channel, &status);
+	if (!status.busy) {
+		irq_unlock(key);
+		return 0;
+	}
+
+	bytes_sent = (ret == 0) ? (data->async.tx.len - status.pending_length) : 0;
+
+	ret = dma_stop(config->tx_dma.dev, config->tx_dma.channel);
+	if (ret == 0) {
+		struct uart_event tx_aborted = {
+			.type = UART_TX_ABORTED,
+			.data.tx.buf = data->async.tx.buf,
+			.data.tx.len = bytes_sent,
+		};
+		async_user_callback(dev, &tx_aborted);
+	}
+
+	irq_unlock(key);
+
 	return 0;
 }
 
-static int api_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int32_t timeout)
+static void uart_max32_async_tx_timeout(struct k_work *work)
 {
-	ARG_UNUSED(dev);
-	ARG_UNUSED(buf);
-	ARG_UNUSED(len);
-	ARG_UNUSED(timeout);
-	return 0;
-}
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct max32_uart_async_tx *tx =
+		CONTAINER_OF(dwork, struct max32_uart_async_tx, timeout_work);
+	struct max32_uart_async_data *async = CONTAINER_OF(tx, struct max32_uart_async_data, tx);
+	struct max32_uart_data *data = CONTAINER_OF(async, struct max32_uart_data, async);
 
-static int api_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
-{
-	ARG_UNUSED(dev);
-	ARG_UNUSED(buf);
-	ARG_UNUSED(len);
-	return 0;
+	api_tx_abort(data->async.uart_dev);
 }
 
 static int api_rx_disable(const struct device *dev)
 {
-	ARG_UNUSED(dev);
+	struct max32_uart_data *data = dev->data;
+	const struct max32_uart_config *config = dev->config;
+	int ret;
+	unsigned int key = irq_lock();
+
+	k_work_cancel_delayable(&data->async.rx.timeout_work);
+
+	Wrap_MXC_UART_DisableRxDMA(config->regs);
+
+	ret = dma_stop(config->rx_dma.dev, config->rx_dma.channel);
+	if (ret) {
+		LOG_ERR("Error stopping Rx DMA (%d)", ret);
+		irq_unlock(key);
+		return ret;
+	}
+
+	api_irq_rx_disable(dev);
+
+	/* Release current buffer event */
+	struct uart_event rel_event = {
+		.type = UART_RX_BUF_RELEASED,
+		.data.rx_buf.buf = data->async.rx.buf,
+	};
+	async_user_callback(dev, &rel_event);
+
+	/* Disable RX event */
+	struct uart_event rx_disabled = {.type = UART_RX_DISABLED};
+
+	async_user_callback(dev, &rx_disabled);
+
+	data->async.rx.buf = NULL;
+	data->async.rx.len = 0;
+	data->async.rx.counter = 0;
+	data->async.rx.offset = 0;
+
+	if (data->async.rx.next_buf) {
+		/* Release next buffer event */
+		struct uart_event next_rel_event = {
+			.type = UART_RX_BUF_RELEASED,
+			.data.rx_buf.buf = data->async.rx.next_buf,
+		};
+		async_user_callback(dev, &next_rel_event);
+		data->async.rx.next_buf = NULL;
+		data->async.rx.next_len = 0;
+	}
+
+	irq_unlock(key);
+
 	return 0;
 }
 
+static void uart_max32_async_rx_callback(const struct device *dma_dev, void *user_data,
+					 uint32_t channel, int status)
+{
+	const struct device *dev = user_data;
+	const struct max32_uart_config *config = dev->config;
+	struct max32_uart_data *data = dev->data;
+	struct max32_uart_async_data *async = &data->async;
+	struct dma_status dma_status;
+
+	unsigned int key = irq_lock();
+
+	dma_get_status(config->rx_dma.dev, config->rx_dma.channel, &dma_status);
+	size_t total_rx = async->rx.len - dma_status.pending_length;
+
+	if (total_rx > async->rx.offset) {
+		async->rx.counter = total_rx - async->rx.offset;
+
+		struct uart_event rdy_event = {
+			.type = UART_RX_RDY,
+			.data.rx.buf = async->rx.buf,
+			.data.rx.len = async->rx.counter,
+			.data.rx.offset = async->rx.offset,
+		};
+		async_user_callback(dev, &rdy_event);
+	}
+
+	if (async->rx.next_buf) {
+		async->rx.offset = 0;
+		async->rx.counter = 0;
+
+		struct uart_event rel_event = {
+			.type = UART_RX_BUF_RELEASED,
+			.data.rx_buf.buf = async->rx.buf,
+		};
+		async_user_callback(dev, &rel_event);
+
+		async->rx.buf = async->rx.next_buf;
+		async->rx.len = async->rx.next_len;
+
+		async->rx.next_buf = NULL;
+		async->rx.next_len = 0;
+		struct uart_event req_event = {
+			.type = UART_RX_BUF_REQUEST,
+		};
+		async_user_callback(dev, &req_event);
+
+		dma_reload(config->rx_dma.dev, config->rx_dma.channel, config->rx_dma.slot,
+			   (uint32_t)async->rx.buf, async->rx.len);
+		dma_start(config->rx_dma.dev, config->rx_dma.channel);
+		async_timer_start(&async->rx.timeout_work, async->rx.timeout);
+	} else {
+		api_rx_disable(dev);
+	}
+
+	irq_unlock(key);
+}
+
+static int api_rx_enable(const struct device *dev, uint8_t *buf, size_t len, int32_t timeout)
+{
+	struct max32_uart_data *data = dev->data;
+	const struct max32_uart_config *config = dev->config;
+	struct dma_status status;
+	struct dma_config dma_cfg = {0};
+	struct dma_block_config dma_blk = {0};
+	int ret;
+
+	unsigned int key = irq_lock();
+
+	if (config->rx_dma.channel == 0xFF) {
+		LOG_ERR("Rx DMA channel is not configured");
+		irq_unlock(key);
+		return -ENOTSUP;
+	}
+
+	ret = dma_get_status(config->rx_dma.dev, config->rx_dma.channel, &status);
+	if (ret < 0 || status.busy) {
+		LOG_ERR("DMA Rx %s", ret < 0 ? "error" : "busy");
+		irq_unlock(key);
+		return ret < 0 ? ret : -EBUSY;
+	}
+
+	data->async.rx.buf = buf;
+	data->async.rx.len = len;
+
+	dma_cfg.channel_direction = MEMORY_TO_PERIPHERAL;
+	dma_cfg.dma_callback = uart_max32_async_rx_callback;
+	dma_cfg.user_data = (void *)dev;
+	dma_cfg.dma_slot = config->rx_dma.slot;
+	dma_cfg.block_count = 1;
+	dma_cfg.source_data_size = 1U;
+	dma_cfg.source_burst_length = 1U;
+	dma_cfg.dest_data_size = 1U;
+	dma_cfg.head_block = &dma_blk;
+	dma_blk.block_size = len;
+	dma_blk.dest_address = (uint32_t)buf;
+
+	ret = dma_config(config->rx_dma.dev, config->rx_dma.channel, &dma_cfg);
+	if (ret < 0) {
+		LOG_ERR("Error configuring Rx DMA (%d)", ret);
+		irq_unlock(key);
+		return ret;
+	}
+
+	ret = dma_start(config->rx_dma.dev, config->rx_dma.channel);
+	if (ret < 0) {
+		LOG_ERR("Error starting Rx DMA (%d)", ret);
+		irq_unlock(key);
+		return ret;
+	}
+
+	data->async.rx.timeout = timeout;
+
+	Wrap_MXC_UART_SetRxDMALevel(config->regs, 1);
+	Wrap_MXC_UART_EnableRxDMA(config->regs);
+
+	struct uart_event buf_req = {
+		.type = UART_RX_BUF_REQUEST,
+	};
+
+	async_user_callback(dev, &buf_req);
+
+	api_irq_rx_enable(dev);
+	async_timer_start(&data->async.rx.timeout_work, timeout);
+
+	irq_unlock(key);
+	return ret;
+}
+
+static int api_rx_buf_rsp(const struct device *dev, uint8_t *buf, size_t len)
+{
+	struct max32_uart_data *data = dev->data;
+
+	data->async.rx.next_buf = buf;
+	data->async.rx.next_len = len;
+
+	return 0;
+}
+
+static void uart_max32_async_rx_timeout(struct k_work *work)
+{
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct max32_uart_async_rx *rx =
+		CONTAINER_OF(dwork, struct max32_uart_async_rx, timeout_work);
+	struct max32_uart_async_data *async = CONTAINER_OF(rx, struct max32_uart_async_data, rx);
+	struct max32_uart_data *data = CONTAINER_OF(async, struct max32_uart_data, async);
+	const struct max32_uart_config *config = data->async.uart_dev->config;
+	struct dma_status status;
+
+	unsigned int key = irq_lock();
+
+	dma_get_status(config->rx_dma.dev, config->rx_dma.channel, &status);
+	uint32_t total_rx = async->rx.len - status.pending_length;
+
+	if (total_rx > async->rx.offset) {
+		async->rx.counter = total_rx - async->rx.offset;
+		struct uart_event rdy_event = {
+			.type = UART_RX_RDY,
+			.data.rx.buf = async->rx.buf,
+			.data.rx.len = async->rx.counter,
+			.data.rx.offset = async->rx.offset,
+		};
+		async_user_callback(async->uart_dev, &rdy_event);
+	}
+	async->rx.offset += async->rx.counter;
+	async->rx.counter = 0;
+
+	k_work_cancel_delayable(&data->async.rx.timeout_work);
+	irq_unlock(key);
+}
+
 #endif
+
+static int uart_max32_init(const struct device *dev)
+{
+	int ret;
+	const struct max32_uart_config *const cfg = dev->config;
+	mxc_uart_regs_t *regs = cfg->regs;
+	struct max32_uart_data *data = dev->data;
+
+	if (!device_is_ready(cfg->clock)) {
+		LOG_ERR("Clock control device not ready");
+		return -ENODEV;
+	}
+
+	ret = MXC_UART_Shutdown(regs);
+	if (ret) {
+		return ret;
+	}
+
+	ret = clock_control_on(cfg->clock, (clock_control_subsys_t) &(cfg->perclk));
+	if (ret != 0) {
+		LOG_ERR("Cannot enable UART clock");
+		return ret;
+	}
+
+	ret = pinctrl_apply_state(cfg->pctrl, PINCTRL_STATE_DEFAULT);
+	if (ret) {
+		return ret;
+	}
+
+	ret = Wrap_MXC_UART_Init(regs);
+	if (ret) {
+		return ret;
+	}
+
+	api_configure(dev, &cfg->uart_conf);
+
+	/* store configuration at the global */
+	data->conf = cfg->uart_conf;
+
+#if CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API
+	/* Clear any pending UART RX/TX interrupts */
+	MXC_UART_ClearFlags(regs, (ADI_MAX32_UART_INT_TX | ADI_MAX32_UART_INT_RX));
+	cfg->irq_config_func(dev);
+#endif
+
+#if CONFIG_UART_ASYNC_API
+	data->async.uart_dev = dev;
+	k_work_init_delayable(&data->async.tx.timeout_work, uart_max32_async_tx_timeout);
+	k_work_init_delayable(&data->async.rx.timeout_work, uart_max32_async_rx_timeout);
+	data->async.rx.len = 0;
+	data->async.rx.offset = 0;
+#endif
+
+	return ret;
+}
 
 static const struct uart_driver_api uart_max32_driver_api = {
 	.poll_in = api_poll_in,
@@ -463,12 +878,38 @@ static const struct uart_driver_api uart_max32_driver_api = {
 #endif /* CONFIG_UART_ASYNC_API */
 };
 
+#if CONFIG_UART_ASYNC_API
+#define MAX32_DT_INST_DMA_CTLR(n, name)                                                            \
+	COND_CODE_1(DT_INST_NODE_HAS_PROP(n, dmas),                                                \
+		    (DEVICE_DT_GET(DT_INST_DMAS_CTLR_BY_NAME(n, name))), (NULL))
+
+#define MAX32_DT_INST_DMA_CELL(n, name, cell)                                                      \
+	COND_CODE_1(DT_INST_NODE_HAS_PROP(n, dmas), (DT_INST_DMAS_CELL_BY_NAME(n, name, cell)),    \
+		    (0xff))
+
+#define MAX32_UART_DMA_INIT(n)                                                                     \
+	.tx_dma.dev = MAX32_DT_INST_DMA_CTLR(n, tx),                                               \
+	.tx_dma.channel = MAX32_DT_INST_DMA_CELL(n, tx, channel),                                  \
+	.tx_dma.slot = MAX32_DT_INST_DMA_CELL(n, tx, slot),                                        \
+	.rx_dma.dev = MAX32_DT_INST_DMA_CTLR(n, rx),                                               \
+	.rx_dma.channel = MAX32_DT_INST_DMA_CELL(n, rx, channel),                                  \
+	.rx_dma.slot = MAX32_DT_INST_DMA_CELL(n, rx, slot),
+#else
+#define MAX32_UART_DMA_INIT(n)
+#endif
+
+#if CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API
+#define MAX32_UART_USE_IRQ 1
+#else
+#define MAX32_UART_USE_IRQ 0
+#endif
+
 #define MAX32_UART_INIT(_num)                                                                      \
 	PINCTRL_DT_INST_DEFINE(_num);                                                              \
-	IF_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN,                                                   \
+	IF_ENABLED(MAX32_UART_USE_IRQ,                                                             \
 		   (static void uart_max32_irq_init_##_num(const struct device *dev) {             \
 			   IF_ENABLED(                                                             \
-				   CONFIG_UART_INTERRUPT_DRIVEN,                                   \
+				   MAX32_UART_USE_IRQ,                                             \
 				   (IRQ_CONNECT(DT_INST_IRQN(_num), DT_INST_IRQ(_num, priority),   \
 						uart_max32_isr, DEVICE_DT_INST_GET(_num), 0);      \
 				    irq_enable(DT_INST_IRQN(_num))));                              \
@@ -486,8 +927,8 @@ static const struct uart_driver_api uart_max32_driver_api = {
 		.uart_conf.stop_bits = DT_INST_ENUM_IDX_OR(_num, stop_bits, UART_CFG_STOP_BITS_1), \
 		.uart_conf.flow_ctrl =                                                             \
 			DT_INST_PROP_OR(index, hw_flow_control, UART_CFG_FLOW_CTRL_NONE),          \
-		IF_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN,                                           \
-			   (.irq_config_func = uart_max32_irq_init_##_num, ))};                    \
+		MAX32_UART_DMA_INIT(_num) IF_ENABLED(                                              \
+			MAX32_UART_USE_IRQ, (.irq_config_func = uart_max32_irq_init_##_num,))};   \
 	static struct max32_uart_data max32_uart_data##_num = {                                    \
 		IF_ENABLED(CONFIG_UART_INTERRUPT_DRIVEN, (.cb = NULL, ))};                         \
 	DEVICE_DT_INST_DEFINE(_num, uart_max32_init, NULL, &max32_uart_data##_num,                 \
