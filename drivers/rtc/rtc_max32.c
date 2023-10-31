@@ -154,6 +154,7 @@ static int api_set_time(const struct device *dev, const struct rtc_time *timeptr
 			}
 		} else if (data->alarm_sec < SECS_PER_WEEK) { /* less than a week */
 			uint8_t wday_alarm = (data->alarm_sec) / SECS_PER_DAY;
+
 			if (timeptr->tm_wday <= wday_alarm) {
 				alarm_time =
 					sec -
@@ -197,11 +198,12 @@ static int api_get_time(const struct device *dev, struct rtc_time *timeptr)
 static int api_alarm_get_supported_fields(const struct device *dev, uint16_t id, uint16_t *mask)
 {
 	struct max32_rtc_data *data = dev->data;
+
 	if (data->alarms_count <= id) {
 		return -EINVAL;
 	}
 
-	(*mask) = RTC_ALARM_MASK;
+	*mask = RTC_ALARM_MASK;
 
 	return 0;
 }
@@ -235,6 +237,7 @@ static int api_alarm_set_time(const struct device *dev, uint16_t id, uint16_t ma
 
 	// Calculating sec number from timeptr
 	time_t alarm_sec = 0;
+
 	if (mask & RTC_ALARM_TIME_MASK_SECOND) {
 		alarm_sec += timeptr->tm_sec;
 	}
@@ -301,12 +304,6 @@ static int api_alarm_set_callback(const struct device *dev, uint16_t id,
 		return -EINVAL;
 	}
 
-	if (callback == NULL) {
-		data->alarm_cb = NULL;
-		data->alarm_cb_data = NULL;
-		return 0;
-	}
-
 	data->alarm_cb = callback;
 	data->alarm_cb_data = user_data;
 
@@ -325,19 +322,16 @@ static int api_update_set_callback(const struct device *dev, rtc_update_callback
 		;
 	}
 
-	if (callback == NULL) {
+	data->update_cb = callback;
+	data->update_cb_data = user_data;
+	if (data->update_cb == NULL) {
 		while (MXC_RTC_DisableInt(MXC_RTC_INT_EN_SHORT) == E_BUSY) {
 			;
 		}
-		data->update_cb = NULL;
-		data->update_cb_data = NULL;
-		return 0;
-	}
-
-	data->update_cb = callback;
-	data->update_cb_data = user_data;
-	while (MXC_RTC_EnableInt(MXC_RTC_INT_EN_SHORT) == E_BUSY) {
-		;
+	} else {
+		while (MXC_RTC_EnableInt(MXC_RTC_INT_EN_SHORT) == E_BUSY) {
+			;
+		}
 	}
 
 	return 0;
@@ -363,7 +357,7 @@ static int api_get_calibration(const struct device *dev, int32_t *calibration)
 {
 	ARG_UNUSED(dev);
 
-	*calibration = (int8_t)((uint8_t)(((mxc_rtc_regs_t *)MXC_RTC)->trim) & MXC_F_RTC_TRIM_TRIM);
+	*calibration = MXC_RTC->trim & MXC_F_RTC_TRIM_TRIM;
 
 	return 0;
 }
@@ -423,6 +417,7 @@ static int rtc_max32_init(const struct device *dev)
 {
 #if defined(CONFIG_RTC_ALARM) || defined(CONFIG_RTC_UPDATE)
 	const struct max32_rtc_config *cfg = dev->config;
+
 	cfg->irq_func();
 #endif /* CONFIG_RTC_ALARM || CONFIG_RTC_UPDATE */
 	return 0;
