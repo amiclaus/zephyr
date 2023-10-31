@@ -92,6 +92,7 @@ static int wdt_max32_calculate_timeout(uint32_t timeout, uint32_t clock_src)
 static int api_disable(const struct device *dev)
 {
 	const struct max32_wdt_config *cfg = dev->config;
+
 	MXC_WDT_Disable(cfg->regs);
 	return 0;
 }
@@ -99,8 +100,8 @@ static int api_disable(const struct device *dev)
 static int api_feed(const struct device *dev, int channel_id)
 {
 	ARG_UNUSED(channel_id);
-
 	const struct max32_wdt_config *cfg = dev->config;
+
 	MXC_WDT_ResetTimer(cfg->regs);
 	return 0;
 }
@@ -120,6 +121,7 @@ static int api_setup(const struct device *dev, uint8_t options)
 
 static int api_install_timeout(const struct device *dev, const struct wdt_timeout_cfg *cfg)
 {
+	int ret = 0;
 	const struct max32_wdt_config *dev_cfg = dev->config;
 	struct max32_wdt_data *data = dev->data;
 	mxc_wdt_regs_t *regs = dev_cfg->regs;
@@ -142,7 +144,7 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 	if (data->timeout.min > 0) {
 		wdt_cfg.mode = MXC_WDT_WINDOWED;
 
-		int ret = Wrap_MXC_WDT_Init(regs, &wdt_cfg);
+		ret = Wrap_MXC_WDT_Init(regs, &wdt_cfg);
 		if (ret != E_NO_ERROR) {
 			LOG_DBG("%s does not support windowed mode.", CONFIG_BOARD);
 			return -EINVAL;
@@ -221,7 +223,7 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 		MXC_WDT_EnableInt(regs);
 	}
 
-	return 0;
+	return ret;
 }
 
 static void wdt_max32_isr(const void *param)

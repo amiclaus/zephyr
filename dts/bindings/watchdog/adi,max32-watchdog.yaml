@@ -14,7 +14,6 @@ properties:
   clock-source:
     type: int
     enum: [0, 1, 2, 3, 4, 5]
-    default: 2
     description: |
       Clock source to be used by the WDT peripheral. The following options
       are available:

@@ -85,7 +85,7 @@
 			status = "okay";
 
 			flash0: flash@10000000 {
-				compatible = "adi,max32-flash", "soc-nv-flash";
+				compatible = "soc-nv-flash";
 				reg = <0x10000000 DT_SIZE_K(512)>;
 				write-block-size = <16>;
 				erase-block-size = <8192>;
