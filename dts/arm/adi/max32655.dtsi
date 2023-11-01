@@ -15,6 +15,10 @@
  #include <freq.h>
 
 / {
+	chosen {
+		zephyr,entropy = &trng;
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -329,6 +333,12 @@
 			};
 		};
 
+		trng: trng@4004d000 {
+			compatible = "adi,max32-trng";
+			reg = <0x4004d000 0x1000>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 2>;
+			status = "disabled";
+		};
 	};
 };
 
