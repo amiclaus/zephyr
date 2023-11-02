@@ -21,8 +21,31 @@
 #include "flc.h"
 
 struct max32_flash_dev_data {
+#ifdef CONFIG_MULTITHREADING
 	struct k_sem sem;
+#endif
 };
+
+#ifdef CONFIG_MULTITHREADING
+static inline void max32_sem_take(const struct device *dev)
+{
+	struct max32_flash_dev_data *data = dev->data;
+
+	k_sem_take(&data->sem, K_FOREVER);
+}
+
+static inline void max32_sem_give(const struct device *dev)
+{
+	struct max32_flash_dev_data *data = dev->data;
+
+	k_sem_give(&data->sem);
+}
+#else
+
+#define max32_sem_take(dev)
+#define max32_sem_give(dev)
+
+#endif /* CONFIG_MULTITHREADING */
 
 static int api_read(const struct device *dev, off_t address, void *buffer, size_t length)
 {
@@ -36,14 +59,13 @@ static int api_read(const struct device *dev, off_t address, void *buffer, size_
 static int api_write(const struct device *dev, off_t address, const void *buffer, size_t length)
 {
 	int ret = 0;
-	struct max32_flash_dev_data *data = dev->data;
 
-	k_sem_take(&data->sem, K_FOREVER);
+	max32_sem_take(dev);
 
 	address += FLASH_BASE;
 	ret = MXC_FLC_Write(address, length, (uint32_t *)buffer);
 
-	k_sem_give(&data->sem);
+	max32_sem_give(dev);
 
 	return ret;
 }
@@ -51,11 +73,10 @@ static int api_write(const struct device *dev, off_t address, const void *buffer
 static int api_erase(const struct device *dev, off_t start, size_t len)
 {
 	int ret = 0;
-	struct max32_flash_dev_data *data = dev->data;
 	uint32_t page_size = FLASH_ERASE_BLK_SZ;
 	uint32_t addr = (start + FLASH_BASE);
 
-	k_sem_take(&data->sem, K_FOREVER);
+	max32_sem_take(dev);
 
 	while (len) {
 		ret = MXC_FLC_PageErase(addr);
@@ -71,7 +92,7 @@ static int api_erase(const struct device *dev, off_t start, size_t len)
 		}
 	}
 
-	k_sem_give(&data->sem);
+	max32_sem_give(dev);
 
 	return ret;
 }
@@ -105,13 +126,15 @@ static const struct flash_parameters *api_get_parameters(const struct device *de
 static int flash_max32_init(const struct device *dev)
 {
 	int ret;
-	struct max32_flash_dev_data *data = dev->data;
 
 	ret = MXC_FLC_Init();
 
+#ifdef CONFIG_MULTITHREADING
+	struct max32_flash_dev_data *data = dev->data;
+
 	/* Mutex for flash controller */
 	k_sem_init(&data->sem, 1, 1);
-
+#endif
 	return ret;
 }
 
