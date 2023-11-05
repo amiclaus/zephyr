@@ -107,23 +107,66 @@ static int spi_configure(const struct device *dev, const struct spi_config *conf
 	return ret;
 }
 
+static int spi_max32_transceive(const struct device *dev)
+{
+	int ret;
+	const struct max32_spi_config *cfg = dev->config;
+	struct max32_spi_data *data = dev->data;
+	struct spi_context *ctx = &data->ctx;
+	mxc_spi_req_t req;
+	uint32_t len;
+	uint8_t word_size, dfs_shift;
+
+	word_size = SPI_WORD_SIZE_GET(ctx->config->operation);
+	if (word_size < 9) {
+		/* DFS = 1 */
+		dfs_shift = 0;
+	} else {
+		/* DFS = 2 */
+		dfs_shift = 1;
+	}
+
+	len = spi_context_max_continuous_chunk(ctx);
+	req.txLen = len >> dfs_shift;
+	req.txData = ctx->tx_buf;
+	req.rxLen = len >> dfs_shift;
+	req.rxData = ctx->rx_buf;
+
+	req.spi = cfg->regs;
+	req.ssIdx = ctx->config->slave;
+	req.ssDeassert = 1;
+	req.txCnt = 0;
+	req.rxCnt = 0;
+
+	ret = MXC_SPI_MasterTransaction(&req);
+	if (ret) {
+		ret = -EIO;
+	} else {
+		spi_context_update_tx(ctx, 1, len);
+		spi_context_update_rx(ctx, 1, len);
+	}
+
+	return ret;
+}
+
 static int api_transceive(const struct device *dev, const struct spi_config *config,
 			  const struct spi_buf_set *tx_bufs, const struct spi_buf_set *rx_bufs)
 {
 	int ret = 0;
 	const struct max32_spi_config *cfg = dev->config;
 	struct max32_spi_data *data = dev->data;
-	int i, n = 0;
-	mxc_spi_req_t req;
-	int rx_len = 0;
-	int tx_len = 0;
-	int nul_rx_len = 0;
+	struct spi_context *ctx = &data->ctx;
 	bool hw_cs_ctrl = true;
+
+	spi_context_lock(ctx, false, NULL, NULL, config);
 
 	ret = spi_configure(dev, config);
 	if (ret != 0) {
+		spi_context_release(ctx, ret);
 		return -EIO;
 	}
+
+	spi_context_buffers_setup(ctx, tx_bufs, rx_bufs, 1);
 
 	/* Check if CS GPIO exists */
 	if (spi_cs_is_gpio(config)) {
@@ -136,67 +179,30 @@ static int api_transceive(const struct device *dev, const struct spi_config *con
 		spi_context_cs_control(&data->ctx, true);
 	}
 
-	req.spi = cfg->regs;
-
-	if (tx_bufs) {
-		/* Get total tx length */
-		for (i = 0; i < tx_bufs->count; i++) {
-			tx_len += tx_bufs->buffers[i].len;
-		}
-		req.txData = (uint8_t *)tx_bufs->buffers->buf;
-		req.txLen = tx_len;
-	} else {
-		req.txData = NULL;
-		req.txLen = 0;
-	}
-
-	if (rx_bufs) {
-		/* Get total rx length */
-		for (i = 0; i < rx_bufs->count; i++) {
-			rx_len += rx_bufs->buffers[i].len;
-		}
-		/* Get first non-null rx spi_buf, store null buffer(s) length */
-		while (rx_bufs->buffers[n].buf == NULL) {
-			nul_rx_len += rx_bufs->buffers[n].len;
-			n++;
-		}
-		/* Ignore nul_rx_len bytes */
-		req.rxData = (uint8_t *)rx_bufs->buffers[n].buf - nul_rx_len;
-		req.rxLen = rx_len;
-	} else {
-		req.rxData = NULL;
-		req.rxLen = 0;
-	}
-
-	if (rx_len > tx_len) {
-		/* Need to send dummy bytes, such that tx len = rx len
-		 * We will use the rx data buffer, initialized to 0 */
-		memset(req.rxData, 0, rx_len);
-		memcpy(req.rxData, tx_bufs->buffers->buf, tx_len);
-		req.txData = req.rxData;
-		req.txLen = rx_len;
-	}
-
-	req.ssIdx = config->slave;
-	req.ssDeassert = 1;
-	req.txCnt = 0;
-	req.rxCnt = 0;
-
-	ret = MXC_SPI_MasterTransaction(&req);
-	if (ret) {
-		ret = -EIO;
-	}
+	do {
+		ret = spi_max32_transceive(dev);
+	} while (!ret && (spi_context_tx_on(ctx) || spi_context_rx_on(ctx)));
 
 	/* Deassert the CS line if hw control disabled */
 	if (!hw_cs_ctrl) {
 		spi_context_cs_control(&data->ctx, false);
 	}
 
+	spi_context_release(ctx, ret);
+
 	return ret;
 }
 
 static int api_release(const struct device *dev, const struct spi_config *config)
 {
+	struct max32_spi_data *data = dev->data;
+
+	if (!spi_context_configured(&data->ctx, config)) {
+		return -EINVAL;
+	}
+
+	spi_context_unlock_unconditionally(&data->ctx);
+
 	return 0;
 }
 
@@ -229,6 +235,8 @@ static int spi_max32_init(const struct device *dev)
 	if (ret < 0) {
 		return ret;
 	}
+
+	spi_context_unlock_unconditionally(&data->ctx);
 
 	return ret;
 }
