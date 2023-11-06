@@ -209,6 +209,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS1 14>;
+			interrupts = <56 0>;
 			status = "disabled";
 		};
 
@@ -218,6 +219,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 6>;
+			interrupts = <16 0>;
 			status = "disabled";
 		};
 
@@ -227,6 +229,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 7>;
+			interrupts = <17 0>;
 			status = "disabled";
 		};
 
