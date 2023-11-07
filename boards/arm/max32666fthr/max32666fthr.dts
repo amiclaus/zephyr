@@ -17,8 +17,6 @@
 	 chosen {
 		 zephyr,console = &uart1;
 		 zephyr,shell-uart = &uart1;
-		 zephyr,sram = &sram0;
-		 zephyr,flash = &flash0;
 	 };
 
 	 leds {
@@ -96,24 +94,6 @@
 
 &trng {
 	status = "okay";
-};
-
-&flash0 {
-	partitions {
-		compatible = "fixed-partitions";
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		code_partition: partition@0 {
-			reg = <0x0 DT_SIZE_K(512)>;
-			read-only;
-		};
-
-		storage_partition: partition@80000 {
-			label = "storage";
-			reg = <0x80000 DT_SIZE_K(512)>;
-		};
-	};
 };
 
 &adc {
