@@ -31,7 +31,7 @@ struct max32_dma_data {
 	uint32_t err_cb_en;
 };
 
-static int is_valid_dma_width(uint32_t width)
+static inline int is_valid_dma_width(uint32_t width)
 {
 	switch (width) {
 	case MXC_DMA_WIDTH_BYTE:
@@ -42,13 +42,13 @@ static int is_valid_dma_width(uint32_t width)
 	return 0;
 }
 
-static int is_valid_dma_ch_prio(uint32_t ch_prio)
+static inline int is_valid_dma_ch_prio(uint32_t ch_prio)
 {
 	/* mxc_dma_priority_t is limited to values 0-3 */
 	return ((ch_prio >= 0 && ch_prio < 4) ? 1 : 0);
 }
 
-static mxc_dma_width_t dma_width_z_to_mxc(uint32_t width)
+static inline mxc_dma_width_t dma_width_z_to_mxc(uint32_t width)
 {
 	switch (width) {
 	case 1:
@@ -62,7 +62,12 @@ static mxc_dma_width_t dma_width_z_to_mxc(uint32_t width)
 	}
 }
 
-static inline int api_config(const struct device *dev, uint32_t channel,
+static inline int get_ch_index(mxc_dma_regs_t *dma,  uint8_t ch)
+{
+	return (ch + MXC_DMA_GET_IDX(dma) * (MXC_DMA_CHANNELS / MXC_DMA_INSTANCES));
+}
+
+static int api_config(const struct device *dev, uint32_t channel,
 				   struct dma_config *config)
 {
 	int ret = 0;
@@ -76,7 +81,7 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 		return -EINVAL;
 	}
 
-	ch = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+	ch = get_ch_index(cfg->regs, channel);
 
 	/* DMA Channel Config */
 	mxc_dma_config_t mxc_dma_cfg;
@@ -147,13 +152,13 @@ static inline int api_config(const struct device *dev, uint32_t channel,
 	return ret;
 }
 
-static inline int api_reload(const struct device *dev, uint32_t channel, uint32_t src,
+static int api_reload(const struct device *dev, uint32_t channel, uint32_t src,
 				   uint32_t dst, size_t size)
 {
 	const struct max32_dma_config *cfg = dev->config;
 	mxc_dma_srcdst_t reload;
 
-	reload.ch = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+	reload.ch = get_ch_index(cfg->regs, channel);
 	reload.source = (void *)src;
 	reload.dest = (void *)dst;
 	reload.len = size;
@@ -170,7 +175,7 @@ static int api_start(const struct device *dev, uint32_t channel)
 		return -EINVAL;
 	}
 
-	channel = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+	channel = get_ch_index(cfg->regs, channel);
 
 	return MXC_DMA_Start(channel);
 }
@@ -185,12 +190,12 @@ static int api_stop(const struct device *dev, uint32_t channel)
 		return -EINVAL;
 	}
 
-	channel = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+	channel = get_ch_index(cfg->regs, channel);
 
 	return MXC_DMA_Stop(channel);
 }
 
-static inline int api_get_status(const struct device *dev, uint32_t channel,
+static int api_get_status(const struct device *dev, uint32_t channel,
 				       struct dma_status *stat)
 {
 	const struct max32_dma_config *cfg = dev->config;
@@ -203,7 +208,7 @@ static inline int api_get_status(const struct device *dev, uint32_t channel,
 		return -EINVAL;
 	}
 
-	channel = Wrap_MXC_DMA_CalculateChannel(cfg->regs, channel);
+	channel = get_ch_index(cfg->regs, channel);
 	mxc_dma_srcdst_t txfer;
 	txfer.ch = channel;
 
@@ -230,7 +235,7 @@ static void max32_dma_isr(const struct device *dev)
 	int flags;
 	int status = 0;
 
-	uint8_t channel_base = Wrap_MXC_DMA_CalculateChannel(cfg->regs, 0);
+	uint8_t channel_base = get_ch_index(cfg->regs, 0);
 
 	for (ch = channel_base, c = 0; c < cfg->channels; ch++, c++) {
 		flags = MXC_DMA_ChannelGetFlags(ch);
