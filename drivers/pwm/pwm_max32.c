@@ -55,7 +55,7 @@ static int api_set_cycles(const struct device *dev, uint32_t channel, uint32_t p
 	}
 	pwm_cfg.mode = TMR_MODE_PWM;
 	pwm_cfg.cmp_cnt = period_cycles;
-	pwm_cfg.pol = 1;
+	pwm_cfg.pol = (flags & PWM_POLARITY_MASK) ? PWM_POLARITY_NORMAL : PWM_POLARITY_INVERTED;
 	pwm_cfg.bitMode = 0;
 
 	pwm_cfg.clock = Wrap_MXC_TMR_GetClockIndex(cfg->clock_source);
