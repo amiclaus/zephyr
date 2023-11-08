@@ -26,12 +26,21 @@ struct max32_spi_config {
 	const struct pinctrl_dev_config *pctrl;
 	const struct device *clock;
 	struct max32_perclk perclk;
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+	void (*irq_config_func)(const struct device *dev);
+#endif /* CONFIG_SPI_MAX32_INTERRUPT */
 };
 
 /* Device run time data */
 struct max32_spi_data {
 	struct spi_context ctx;
+	mxc_spi_req_t req;
+	uint8_t dummy[2];
 };
+
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+static void spi_max32_callback(mxc_spi_req_t *req, int error);
+#endif /* CONFIG_SPI_MAX32_INTERRUPT */
 
 static int spi_configure(const struct device *dev, const struct spi_config *config)
 {
@@ -113,7 +122,6 @@ static int spi_max32_transceive(const struct device *dev)
 	const struct max32_spi_config *cfg = dev->config;
 	struct max32_spi_data *data = dev->data;
 	struct spi_context *ctx = &data->ctx;
-	mxc_spi_req_t req;
 	uint32_t len;
 	uint8_t word_size, dfs_shift;
 
@@ -127,30 +135,50 @@ static int spi_max32_transceive(const struct device *dev)
 	}
 
 	len = spi_context_max_continuous_chunk(ctx);
-	req.txLen = len >> dfs_shift;
-	req.txData = (uint8_t *)ctx->tx_buf;
-	req.rxLen = len >> dfs_shift;
-	req.rxData = ctx->rx_buf;
+	data->req.txLen = len >> dfs_shift;
+	data->req.txData = (uint8_t *)ctx->tx_buf;
+	data->req.rxLen = len >> dfs_shift;
+	data->req.rxData = ctx->rx_buf;
 
-	req.spi = cfg->regs;
-	req.ssIdx = ctx->config->slave;
-	req.ssDeassert = 1;
-	req.txCnt = 0;
-	req.rxCnt = 0;
+	data->req.rxData = ctx->rx_buf;
+	data->req.rxLen = len >> dfs_shift;
+	if (!data->req.rxData) {
+		/* Pass a dummy buffer to HAL if receive buffer is NULL, otherwise
+		 * corrupt data is read during subsequent transactions.
+		 */
+		data->req.rxData = data->dummy;
+		data->req.rxLen = 0;
+	}
 
-	ret = MXC_SPI_MasterTransaction(&req);
+	data->req.spi = cfg->regs;
+	data->req.ssIdx = ctx->config->slave;
+	data->req.ssDeassert = 1;
+	data->req.txCnt = 0;
+	data->req.rxCnt = 0;
+
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+	data->req.completeCB = (spi_complete_cb_t)spi_max32_callback;
+
+	ret = MXC_SPI_MasterTransactionAsync(&data->req);
+	if (ret) {
+		ret = -EIO;
+	}
+#else
+	ret = MXC_SPI_MasterTransaction(&data->req);
 	if (ret) {
 		ret = -EIO;
 	} else {
 		spi_context_update_tx(ctx, 1, len);
 		spi_context_update_rx(ctx, 1, len);
 	}
+#endif
 
 	return ret;
 }
 
-static int api_transceive(const struct device *dev, const struct spi_config *config,
-			  const struct spi_buf_set *tx_bufs, const struct spi_buf_set *rx_bufs)
+static int transceive(const struct device *dev, const struct spi_config *config,
+		      const struct spi_buf_set *tx_bufs, const struct spi_buf_set *rx_bufs,
+		      bool async, spi_callback_t cb, void *userdata)
 {
 	int ret = 0;
 	const struct max32_spi_config *cfg = dev->config;
@@ -158,7 +186,13 @@ static int api_transceive(const struct device *dev, const struct spi_config *con
 	struct spi_context *ctx = &data->ctx;
 	bool hw_cs_ctrl = true;
 
-	spi_context_lock(ctx, false, NULL, NULL, config);
+#ifndef CONFIG_SPI_MAX32_INTERRUPT
+	if (async) {
+		return -ENOTSUP;
+	}
+#endif
+
+	spi_context_lock(ctx, async, cb, userdata, config);
 
 	ret = spi_configure(dev, config);
 	if (ret != 0) {
@@ -176,9 +210,19 @@ static int api_transceive(const struct device *dev, const struct spi_config *con
 
 	/* Assert the CS line if HW control disabled */
 	if (!hw_cs_ctrl) {
-		spi_context_cs_control(&data->ctx, true);
+		spi_context_cs_control(ctx, true);
 	}
 
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+	do {
+		ret = spi_max32_transceive(dev);
+		if (!ret) {
+			spi_context_wait_for_completion(ctx);
+		} else {
+			break;
+		}
+	} while ((spi_context_tx_on(ctx) || spi_context_rx_on(ctx)));
+#else
 	do {
 		ret = spi_max32_transceive(dev);
 		if (ret != 0) {
@@ -188,13 +232,52 @@ static int api_transceive(const struct device *dev, const struct spi_config *con
 
 	/* Deassert the CS line if hw control disabled */
 	if (!hw_cs_ctrl) {
-		spi_context_cs_control(&data->ctx, false);
+		spi_context_cs_control(ctx, false);
 	}
+#endif /* CONFIG_SPI_MAX32_INTERRUPT */
 
 	spi_context_release(ctx, ret);
 
 	return ret;
 }
+
+static int api_transceive(const struct device *dev, const struct spi_config *config,
+			  const struct spi_buf_set *tx_bufs, const struct spi_buf_set *rx_bufs)
+{
+	return transceive(dev, config, tx_bufs, rx_bufs, false, NULL, NULL);
+}
+
+#ifdef CONFIG_SPI_ASYNC
+static int api_transceive_async(const struct device *dev, const struct spi_config *config,
+				const struct spi_buf_set *tx_bufs,
+				const struct spi_buf_set *rx_bufs, spi_callback_t cb,
+				void *userdata)
+{
+	return transceive(dev, config, tx_bufs, rx_bufs, true, cb, userdata);
+}
+#endif /* CONFIG_SPI_ASYNC */
+
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+static void spi_max32_callback(mxc_spi_req_t *req, int error)
+{
+	struct max32_spi_data *data = CONTAINER_OF(req, struct max32_spi_data, req);
+	struct spi_context *ctx = &data->ctx;
+	const struct device *dev = CONTAINER_OF((void *)data, struct device, data);
+	uint32_t len;
+
+	len = spi_context_max_continuous_chunk(ctx);
+	spi_context_update_tx(ctx, 1, len);
+	spi_context_update_rx(ctx, 1, len);
+	spi_context_complete(ctx, dev, error == E_NO_ERROR ? 0 : -EIO);
+}
+
+static void spi_max32_isr(const struct device *dev)
+{
+	const struct max32_spi_config *cfg = dev->config;
+
+	MXC_SPI_AsyncHandler(cfg->regs);
+}
+#endif /* CONFIG_SPI_MAX32_INTERRUPT */
 
 static int api_release(const struct device *dev, const struct spi_config *config)
 {
@@ -239,6 +322,10 @@ static int spi_max32_init(const struct device *dev)
 		return ret;
 	}
 
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+	cfg->irq_config_func(dev);
+#endif
+
 	spi_context_unlock_unconditionally(&data->ctx);
 
 	return ret;
@@ -247,19 +334,38 @@ static int spi_max32_init(const struct device *dev)
 /* SPI driver APIs structure */
 static struct spi_driver_api spi_max32_api = {
 	.transceive = api_transceive,
+#ifdef CONFIG_SPI_ASYNC
+	.transceive_async = api_transceive_async,
+#endif /* CONFIG_SPI_ASYNC */
 	.release = api_release,
 };
 
 /* SPI driver registration */
+#ifdef CONFIG_SPI_MAX32_INTERRUPT
+#define SPI_MAX32_CONFIG_IRQ_FUNC(n) .irq_config_func = spi_max32_irq_config_func_##n,
+
+#define SPI_MAX32_IRQ_CONFIG_FUNC(n)                                                               \
+	static void spi_max32_irq_config_func_##n(const struct device *dev)                        \
+	{                                                                                          \
+		IRQ_CONNECT(DT_INST_IRQN(n), DT_INST_IRQ(n, priority), spi_max32_isr,              \
+			    DEVICE_DT_INST_GET(n), 0);                                             \
+		irq_enable(DT_INST_IRQN(n));                                                       \
+	}
+#else
+#define SPI_MAX32_CONFIG_IRQ_FUNC(n)
+#define SPI_MAX32_IRQ_CONFIG_FUNC(n)
+#endif /* CONFIG_SPI_MAX32_INTERRUPT */
+
 #define DEFINE_SPI_MAX32(_num)                                                                     \
 	PINCTRL_DT_INST_DEFINE(_num);                                                              \
+	SPI_MAX32_IRQ_CONFIG_FUNC(_num)                                                            \
 	static const struct max32_spi_config max32_spi_config_##_num = {                           \
 		.regs = (mxc_spi_regs_t *)DT_INST_REG_ADDR(_num),                                  \
 		.pctrl = PINCTRL_DT_INST_DEV_CONFIG_GET(_num),                                     \
 		.clock = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(_num)),                                 \
 		.perclk.bus = DT_INST_CLOCKS_CELL(_num, offset),                                   \
 		.perclk.bit = DT_INST_CLOCKS_CELL(_num, bit),                                      \
-	};                                                                                         \
+		SPI_MAX32_CONFIG_IRQ_FUNC(_num)};                                                  \
 	static struct max32_spi_data max32_spi_data_##_num = {                                     \
 		SPI_CONTEXT_INIT_LOCK(max32_spi_data_##_num, ctx),                                 \
 		SPI_CONTEXT_INIT_SYNC(max32_spi_data_##_num, ctx),                                 \

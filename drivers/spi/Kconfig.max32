@@ -7,3 +7,12 @@ config SPI_MAX32_V1
 	depends on DT_HAS_ADI_MAX32_SPI_ENABLED
 	help
 	  Enable SPI support on the MAX32 family of processors.
+
+if SPI_MAX32_V1
+
+config SPI_MAX32_INTERRUPT
+	bool "MAX32 MCU SPI Interrupt Support"
+	help
+		Enable interrupt support for MAX32 MCU SPI driver.
+
+endif # SPI_MAX32_V1
