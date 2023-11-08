@@ -56,11 +56,12 @@ static int api_set_cycles(const struct device *dev, uint32_t channel, uint32_t p
 	pwm_cfg.mode = TMR_MODE_PWM;
 	pwm_cfg.cmp_cnt = period_cycles;
 	pwm_cfg.pol = 1;
-
-#if defined(CONFIG_SOC_MAX32690) || (CONFIG_SOC_MAX32655)
-	pwm_cfg.clock = MXC_TMR_APB_CLK;
 	pwm_cfg.bitMode = 0;
-#endif
+
+	pwm_cfg.clock = Wrap_MXC_TMR_GetClockIndex(cfg->clock_source);
+	if (pwm_cfg.clock < 0) {
+		return -ENOTSUP;
+	}
 
 	MXC_TMR_Shutdown(regs);
 
@@ -112,9 +113,16 @@ static int api_get_cycles_per_sec(const struct device *dev, uint32_t channel, ui
 		clk_frequency = ADI_MAX32_CLK_INRO_FREQ;
 		break;
 
+	case ADI_MAX32_PRPH_CLK_SRC_ISO:
+		clk_frequency = ADI_MAX32_CLK_ISO_FREQ;
+		break;
+
+	case ADI_MAX32_PRPH_CLK_SRC_IBRO_DIV8:
+		clk_frequency = ADI_MAX32_CLK_IBRO_FREQ / 8;
+		break;
+
 	default:
-		// Unsupported clock source.
-		return -ENOTSUP;
+		return -ENOTSUP; /* Unsupported clock source */
 	}
 
 	*cycles = (uint64_t)(clk_frequency / cfg->prescaler);
