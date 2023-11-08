@@ -16,7 +16,7 @@ properties:
 
   clock-source:
     type: int
-    enum: [0, 1, 2, 3, 4, 5]
+    enum: [0, 1, 2, 3, 4, 5, 6, 7]
     description: |
       Clock source to be used by the WDT peripheral. The following options
       are available:
@@ -26,6 +26,8 @@ properties:
       - 3: "ADI_MAX32_PRPH_CLK_SRC_ERFO" External Radio Frequency Oscillator
       - 4: "ADI_MAX32_PRPH_CLK_SRC_ERTCO" External Real-Time Clock Oscillator
       - 5: "ADI_MAX32_PRPH_CLK_SRC_INRO" Internal Ring Oscillator
+      - 6: "ADI_MAX32_PRPH_CLK_SRC_ISO" Internal Secondary Oscillator
+      - 7: "ADI_MAX32_PRPH_CLK_SRC_IBRO_DIV8" IBRO/8
       The target device might not support all option please take a look on
       target device user guide
 
