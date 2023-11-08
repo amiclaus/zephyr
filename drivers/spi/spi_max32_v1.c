@@ -128,7 +128,7 @@ static int spi_max32_transceive(const struct device *dev)
 
 	len = spi_context_max_continuous_chunk(ctx);
 	req.txLen = len >> dfs_shift;
-	req.txData = ctx->tx_buf;
+	req.txData = (uint8_t *)ctx->tx_buf;
 	req.rxLen = len >> dfs_shift;
 	req.rxData = ctx->rx_buf;
 
@@ -181,7 +181,10 @@ static int api_transceive(const struct device *dev, const struct spi_config *con
 
 	do {
 		ret = spi_max32_transceive(dev);
-	} while (!ret && (spi_context_tx_on(ctx) || spi_context_rx_on(ctx)));
+		if (ret != 0) {
+			break;
+		}
+	} while (spi_context_tx_on(ctx) || spi_context_rx_on(ctx));
 
 	/* Deassert the CS line if hw control disabled */
 	if (!hw_cs_ctrl) {
