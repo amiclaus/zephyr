@@ -132,7 +132,7 @@
 			};
 
 			gpio2: gpio@40080400 {
-				reg = <0x40080400 0x1000>;
+				reg = <0x40080400 0x200>;
 				compatible = "adi,max32-gpio";
 				gpio-controller;
 				#gpio-cells = <2>;
@@ -142,7 +142,7 @@
 			};
 
 			gpio3: gpio@40080600 {
-				reg = <0x40080600 0x1000>;
+				reg = <0x40080600 0x200>;
 				compatible = "adi,max32-gpio";
 				gpio-controller;
 				#gpio-cells = <2>;
