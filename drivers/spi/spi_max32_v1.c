@@ -34,8 +34,12 @@ struct max32_spi_config {
 /* Device run time data */
 struct max32_spi_data {
 	struct spi_context ctx;
+	const struct device *dev;
 	mxc_spi_req_t req;
 	uint8_t dummy[2];
+#ifdef CONFIG_SPI_ASYNC
+	struct k_work async_work;
+#endif /* CONFIG_SPI_ASYNC */
 };
 
 #ifdef CONFIG_SPI_MAX32_INTERRUPT
@@ -155,7 +159,6 @@ static int spi_max32_transceive(const struct device *dev)
 	data->req.ssDeassert = 1;
 	data->req.txCnt = 0;
 	data->req.rxCnt = 0;
-
 #ifdef CONFIG_SPI_MAX32_INTERRUPT
 	data->req.completeCB = (spi_complete_cb_t)spi_max32_callback;
 
@@ -218,6 +221,9 @@ static int transceive(const struct device *dev, const struct spi_config *config,
 		ret = spi_max32_transceive(dev);
 		if (!ret) {
 			spi_context_wait_for_completion(ctx);
+			if (async) {
+				break;
+			}
 		} else {
 			break;
 		}
@@ -262,14 +268,36 @@ static void spi_max32_callback(mxc_spi_req_t *req, int error)
 {
 	struct max32_spi_data *data = CONTAINER_OF(req, struct max32_spi_data, req);
 	struct spi_context *ctx = &data->ctx;
-	const struct device *dev = CONTAINER_OF((void *)data, struct device, data);
+	const struct device *dev = data->dev;
 	uint32_t len;
 
 	len = spi_context_max_continuous_chunk(ctx);
 	spi_context_update_tx(ctx, 1, len);
 	spi_context_update_rx(ctx, 1, len);
+#ifdef CONFIG_SPI_ASYNC
+	if (ctx->asynchronous && ((spi_context_tx_on(ctx) || spi_context_rx_on(ctx)))) {
+		k_work_submit(&data->async_work);
+	} else {
+		spi_context_complete(ctx, dev, error == E_NO_ERROR ? 0 : -EIO);
+	}
+#else
 	spi_context_complete(ctx, dev, error == E_NO_ERROR ? 0 : -EIO);
+#endif
 }
+
+#ifdef CONFIG_SPI_ASYNC
+void spi_max32_async_work_handler(struct k_work *work)
+{
+	struct max32_spi_data *data = CONTAINER_OF(work, struct max32_spi_data, async_work);
+	const struct device *dev = data->dev;
+	int ret;
+
+	ret = spi_max32_transceive(dev);
+	if (ret) {
+		spi_context_complete(&data->ctx, dev, -EIO);
+	}
+}
+#endif /* CONFIG_SPI_ASYNC */
 
 static void spi_max32_isr(const struct device *dev)
 {
@@ -322,8 +350,13 @@ static int spi_max32_init(const struct device *dev)
 		return ret;
 	}
 
+	data->dev = dev;
+
 #ifdef CONFIG_SPI_MAX32_INTERRUPT
 	cfg->irq_config_func(dev);
+#ifdef CONFIG_SPI_ASYNC
+	k_work_init(&data->async_work, spi_max32_async_work_handler);
+#endif
 #endif
 
 	spi_context_unlock_unconditionally(&data->ctx);
