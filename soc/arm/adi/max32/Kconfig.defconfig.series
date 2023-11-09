@@ -5,7 +5,7 @@
 
 if SOC_SERIES_MAX32
 
-source "soc/arm/adi_max/max32/Kconfig.defconfig.max32*"
+source "soc/arm/adi/max32/Kconfig.defconfig.max32*"
 
 config SOC_SERIES
 	default "max32"
