@@ -50,7 +50,6 @@
 		sw0 = &pb0;
 		rtc = &rtc;
 		watchdog0 = &wdt0;
-		pwm-0 = &pwm0;
 	 };
 };
 
@@ -118,15 +117,6 @@
 
 &wdt0 {
 	status = "okay";
-};
-
-&timer0 {
-	status = "okay";
-	pwm0: pwm {
-		status = "okay";
-		pinctrl-0 = <&tmr0c_ioa_p0_4>;
-		pinctrl-names = "default";
-	};
 };
 
 &trng {
