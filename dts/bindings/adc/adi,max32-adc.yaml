@@ -5,7 +5,7 @@ description: ADI MAX32 I2C
 
 compatible: "adi,max32-adc"
 
-include: [adc-controller.yaml]
+include: [adc-controller.yaml, pinctrl-device.yaml]
 
 properties:
   reg:
@@ -14,10 +14,29 @@ properties:
   interrupts:
     required: true
 
+  clocks:
+    required: true
+
+  pinctrl-0:
+    required: true
+
+  pinctrl-names:
+    required: true
+
   channel-count:
     type: int
     required: true
     description: The maximum channels supported on each unit.
+
+  vref-mv:
+    type: int
+    required: true
+    description: Indicates the reference voltage of the ADC in mV (on the target board).
+
+  resolution:
+    type: int
+    required: true
+    description: Indicates the resolution supported by the ADC instance.
 
   "#io-channel-cells":
     const: 1

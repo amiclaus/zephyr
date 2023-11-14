@@ -345,10 +345,13 @@
 		adc: adc@40034000 {
 			compatible = "adi,max32-adc";
 			reg = <0x40034000 0x1000>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS0 23>;
 			channel-count = <17>;
 			#io-channel-cells = <1>;
 			status = "disabled";
 			interrupts = <20 1>;
+			resolution = <10>;
+			vref-mv = <1220>;
 		};
 
 		trng: trng@4004d000 {
