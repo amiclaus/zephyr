@@ -61,6 +61,16 @@
 #define ADC_2ND_CHANNEL_ID 7
 #define ALIGNMENT 32
 
+#elif defined(CONFIG_BOARD_MAX32655FTHR) || defined(CONFIG_BOARD_MAX32666FTHR)
+
+#define ADC_DEVICE_NODE DT_INST(0, adi_max32_adc)
+#define ADC_RESOLUTION 10
+#define ADC_GAIN ADC_GAIN_1
+#define ADC_REFERENCE ADC_REF_INTERNAL
+#define ADC_ACQUISITION_TIME ADC_ACQ_TIME_DEFAULT
+#define ADC_1ST_CHANNEL_ID 0
+#define ADC_2ND_CHANNEL_ID 1
+#define ALIGNMENT 32
 #endif
 
 /* Invalid value that is not supposed to be written by the driver. It is used
