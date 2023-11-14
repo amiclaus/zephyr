@@ -70,6 +70,14 @@
 	status = "okay";
 };
 
+&adc {
+	status = "okay";
+	pinctrl-0 = <&ain0_p2_0 &ain1_p2_1 &ain2_p2_2 &ain2_p2_2>;
+	pinctrl-names = "default";
+	#address-cells = <1>;
+	#size-cells = <0>;
+};
+
 &clk_ipo {
 	status = "okay";
 };
@@ -96,6 +104,10 @@
 	status = "okay";
 };
 
+&gpio2 {
+	status = "okay";
+};
+
 &rtc {
 	status = "okay";
 	alarms-count = <1>;
@@ -106,5 +118,9 @@
 };
 
 &trng {
+	status = "okay";
+};
+
+&dma0 {
 	status = "okay";
 };

@@ -76,6 +76,10 @@
 	status = "okay";
 };
 
+&gpio3 {
+	status = "okay";
+};
+
 &uart2 {
 	pinctrl-0 = <&uart2a_tx_p1_10 &uart2a_rx_p1_9>;
 	pinctrl-names = "default";
@@ -121,4 +125,12 @@
 
 &trng {
 	status = "okay";
+};
+
+&adc {
+	status = "okay";
+	pinctrl-0 = <&ain0_p3_0 &ain1_p3_1 &ain2_p3_2>;
+	pinctrl-names = "default";
+	#address-cells = <1>;
+	#size-cells = <0>;
 };
