@@ -4,10 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/dt-bindings/dma/max32666_dma.h>
+
 &spi1 {
     status = "okay";
     pinctrl-0 = <&spi1_mosi_p0_17 &spi1_miso_p0_18 &spi1_sck_p0_19 &spi1_ss0_p0_16>;
 	pinctrl-names = "default";
+	dmas = <&dma0 1 MAX32_DMA_SLOT_SPI1_TX>, <&dma0 2 MAX32_DMA_SLOT_SPI1_RX>;
+	dma-names = "tx", "rx";
 
 	slow@0 {
 		compatible = "test-spi-loopback-slow";

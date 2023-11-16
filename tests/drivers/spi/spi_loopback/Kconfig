@@ -7,10 +7,14 @@ source "Kconfig.zephyr"
 config SPI_LOOPBACK_MODE_LOOP
 	bool "Configure the SPI in LOOP mode, so that no extra wiring is needed"
 
-if SOC_SERIES_STM32H7X
+if SOC_SERIES_STM32H7X || SOC_SERIES_MAX32
 
 config SPI_LOOPBACK_16BITS_FRAMES
 	bool "Use 16 bits frames for tests"
+
+endif # SOC_SERIES_STM32H7 || SOC_SERIES_MAX32
+
+if SOC_SERIES_STM32H7X
 
 config DT_DEFINED_NOCACHE
 	bool "Enable this if nocache regions are defined in devicetree"
