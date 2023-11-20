@@ -54,6 +54,7 @@ struct max32_adc_data {
 	uint16_t *repeat_buffer;
 	uint32_t channels;
 	uint32_t sample_channels;
+	uint32_t num_of_sample_channels;
 	const uint8_t resolution;
 };
 
@@ -81,12 +82,8 @@ static void adc_max32_dma_callback(const struct device *dma_dev, void *user_data
 			dma_reload(config->dma.dev, config->dma.channel, (uint32_t)&(config->regs->data), (uint32_t)data->buffer, sizeof(int16_t));
 
 			/* Select a new channel and wait completing ADC reading operation */
-			Wrap_MXC_ADC_ChannelSelect(config->regs, data->sample_channels);
-
-			/* Waiting ADC done flag because DMA is faster than ADC. */
-			MXC_ADC_ClearFlags(MXC_F_ADC_INTR_DONE_IF);
-			config->regs->ctrl |= MXC_F_ADC_CTRL_START;
-			while(MXC_ADC_GetFlags() != MXC_F_ADC_INTR_DONE_IF) {;}
+			Wrap_MXC_ADC_ChannelSelect(&data->sample_channels);
+			Wrap_MXC_ADC_ConfigureConversionDMA(data->num_of_sample_channels);
 
 			dma_start(config->dma.dev, config->dma.channel);
 		} else {
@@ -128,23 +125,19 @@ static int adc_max32_dma_start(const struct device *dev, void *buffer)
 	dma_blk_cfg.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
 	dma_blk_cfg.dest_reload_en = 0;
 	dma_blk_cfg.block_size = sizeof(int16_t);
-
-	dma_cfg.channel_direction = MEMORY_TO_MEMORY;
+	
 	dma_cfg.dma_callback = adc_max32_dma_callback;
 	dma_cfg.user_data = (void *)dev;
 	dma_cfg.dma_slot = config->dma.slot;
-	dma_cfg.source_data_size = 2U;
-	dma_cfg.source_burst_length = 2U;
-	dma_cfg.dest_data_size = 2U;
+	dma_cfg.source_data_size = sizeof(int16_t);
+	dma_cfg.source_burst_length = dma_blk_cfg.block_size;
+	dma_cfg.dest_data_size = sizeof(int16_t);
 	dma_cfg.head_block = &dma_blk_cfg;
 
     /* Select a new channel for ADC */
-	Wrap_MXC_ADC_ChannelSelect(config->regs, data->sample_channels);
-
-	/* Waiting ADC done flag because DMA is faster than ADC. */
-	MXC_ADC_ClearFlags(MXC_F_ADC_INTR_DONE_IF);
-	config->regs->ctrl |= MXC_F_ADC_CTRL_START;
-	while(MXC_ADC_GetFlags() != MXC_F_ADC_INTR_DONE_IF) {;}
+	Wrap_MXC_ADC_ChannelSelect(&data->sample_channels);
+	/* Configure ADC for DMA */
+	Wrap_MXC_ADC_ConfigureConversionDMA(data->num_of_sample_channels);
 
 	ret = dma_config(config->dma.dev, config->dma.channel, &dma_cfg);
 	if (ret < 0) {
@@ -208,6 +201,7 @@ static void adc_context_start_sampling(struct adc_context *ctx)
 	struct max32_adc_data *data = CONTAINER_OF(ctx, struct max32_adc_data, ctx);
 
 	data->sample_channels = ctx->sequence.channels;
+	data->num_of_sample_channels = POPCOUNT(data->sample_channels);
 	data->repeat_buffer = data->buffer;
 
 	adc_max32_start_channel(data->dev);
@@ -224,7 +218,6 @@ static void adc_context_update_buffer_pointer(struct adc_context *ctx, bool repe
 
 static int start_read(const struct device *dev, const struct adc_sequence *seq)
 {
-	const struct max32_adc_config *config = dev->config;
 	struct max32_adc_data *data = dev->data;
 	int ret = 0;
 
@@ -239,7 +232,7 @@ static int start_read(const struct device *dev, const struct adc_sequence *seq)
 		return -EINVAL;
 	}
 
-	Wrap_MXC_ADC_SetCalibration(config->regs, seq->calibrate);
+	Wrap_MXC_ADC_SetCalibration(seq->calibrate);
 	ret = Wrap_MXC_ADC_AverageConfig(seq->oversampling);
 	if (ret != 0) {
 		return ret;
@@ -289,7 +282,7 @@ static int api_read_async(const struct device *dev, const struct adc_sequence *s
 
 static int api_channel_setup(const struct device *dev, const struct adc_channel_cfg *cfg)
 {
-	const struct max32_adc_config *conf = (const struct max32_adc_config *)dev->config;
+	const struct max32_adc_config *conf = dev->config;
 	struct max32_adc_data *data = dev->data;
 	wrap_mxc_adc_scale_t wrap_mxc_scale;
 	uint8_t adc_reference;
@@ -323,7 +316,7 @@ static int api_channel_setup(const struct device *dev, const struct adc_channel_
 	default:
 		return -ENOTSUP;
 	}
-	ret = Wrap_MXC_ADC_ReferenceSelect((mxc_adc_regs_t *)MXC_ADC, adc_reference);
+	ret = Wrap_MXC_ADC_ReferenceSelect(adc_reference);
 	if (ret != 0) {
 		LOG_ERR("Reference is not supported.");
 		return -ENOTSUP;
