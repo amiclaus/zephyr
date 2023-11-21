@@ -12,9 +12,8 @@
 #include <soc.h>
 #include <errno.h>
 
-#define LOG_LEVEL CONFIG_WDT_LOG_LEVEL
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(wdt_max32);
+LOG_MODULE_REGISTER(wdt_max32, CONFIG_WDT_LOG_LEVEL);
 
 #include <wrap_max32_wdt.h>
 
@@ -69,21 +68,8 @@ static int wdt_max32_calculate_timeout(uint32_t timeout, uint32_t clock_src)
 
 	number_of_tick = ((float)timeout * (float)clk_frequency) / 1000;
 
-	/* Find top bit index */
-	for (i = 31; i >= 16; i--) {
-		if (number_of_tick & (1 << i)) {
-			if (number_of_tick & ~(1 << i)) {
-				i += 1; /* round up if is there any more tick */
-			}
-			break;
-		}
-	}
-
-	if (i > 31) {
-		i = 31; /* max */
-	} else if (i < 16) {
-		i = 16; /* min */
-	}
+	i = LOG2CEIL(number_of_tick); /* Find closest bigger 2^i value than number_of_tick. */
+	i = CLAMP(i, 16, 31); /* Limit i between 16 and 31. */
 
 	/* It returns 31 - i because period thresholds are inverse ordered in register. */
 	return (31 - i);
@@ -92,6 +78,10 @@ static int wdt_max32_calculate_timeout(uint32_t timeout, uint32_t clock_src)
 static int api_disable(const struct device *dev)
 {
 	const struct max32_wdt_config *cfg = dev->config;
+
+	if ((cfg->regs->ctrl & WRAP_MXC_F_WDT_CTRL_EN) != WRAP_MXC_F_WDT_CTRL_EN) {
+		return -EFAULT;
+	}
 
 	MXC_WDT_Disable(cfg->regs);
 	return 0;
@@ -109,6 +99,10 @@ static int api_feed(const struct device *dev, int channel_id)
 static int api_setup(const struct device *dev, uint8_t options)
 {
 	const struct max32_wdt_config *cfg = dev->config;
+
+	if (cfg->regs->ctrl & WRAP_MXC_F_WDT_CTRL_EN) {
+		return -EBUSY;
+	}
 
 	if (options & WDT_OPT_PAUSE_IN_SLEEP) {
 		return -ENOTSUP;
@@ -129,6 +123,10 @@ static int api_install_timeout(const struct device *dev, const struct wdt_timeou
 
 	if (cfg->window.max == 0U) {
 		return -EINVAL;
+	}
+
+	if (regs->ctrl & WRAP_MXC_F_WDT_CTRL_EN) {
+		return -EBUSY;
 	}
 
 	data->timeout = cfg->window;
@@ -249,6 +247,12 @@ static int wdt_max32_init(const struct device *dev)
 	ret = clock_control_on(cfg->clock, (clock_control_subsys_t)&cfg->perclk);
 	if (ret) {
 		return ret;
+	}
+
+	ret = Wrap_MXC_WDT_SelectClockSource(regs, cfg->clock_source);
+	if (ret != E_NO_ERROR) {
+		LOG_DBG("WDT instance does not support given clock source.");
+		return -ENOTSUP;
 	}
 
 	/* Disable all actions */
