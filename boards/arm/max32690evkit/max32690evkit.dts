@@ -89,6 +89,15 @@
 	status = "okay";
 };
 
+&uart1 {
+	pinctrl-0 = <&uart1a_tx_p2_16 &uart1a_rx_p2_14>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	data-bits = <8>;
+	parity = "none";
+	status = "okay";
+};
+
 &i2c0 {
 	pinctrl-0 = <&i2c0a_scl_p2_8 &i2c0a_sda_p2_7>;
 	pinctrl-names = "default";
@@ -103,11 +112,57 @@
 	status = "okay";
 };
 
+&spi0b_ss1_p2_26 {
+	power-source = <MAX32_VSEL_VDDIOH>;
+};
+&spi0b_miso_p2_27 {
+	power-source = <MAX32_VSEL_VDDIOH>;
+};
+&spi0b_mosi_p2_28 {
+	power-source = <MAX32_VSEL_VDDIOH>;
+};
+&spi0b_ss1_p2_26 {
+	power-source = <MAX32_VSEL_VDDIOH>;
+};
+&spi0b_sck_p2_29 {
+	power-source = <MAX32_VSEL_VDDIOH>;
+};
+
 &spi0 {
 	pinctrl-0 = <&spi0b_ss1_p2_26 &spi0b_miso_p2_27
 				&spi0b_mosi_p2_28 &spi0b_sck_p2_29>;
 	pinctrl-names = "default";
 	status = "okay";
+	adin1110: adin1110@1 {
+		compatible = "adi,adin1110";
+		reg = <0x1>;
+		spi-max-frequency = <2000000>;
+		int-gpios   = <&gpio0 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW | MAX32_GPIO_VSEL_VDDIOH)>;
+		reset-gpios = <&gpio0 9 (GPIO_ACTIVE_LOW | MAX32_GPIO_VSEL_VDDIOH)>;
+		port1 {
+			local-mac-address = [ CA 2F B7 10 23 63 ];
+		};
+		mdio: mdio {
+			compatible = "adi,adin2111-mdio";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			ethernet-phy@1 {
+				reg = <0x1>;
+				compatible = "adi,adin2111-phy";
+			};
+		};
+	};
+};
+
+&spi1 {
+	pinctrl-0 = <&spi1a_ss0_p1_23 &spi1a_miso_p1_28
+				&spi1a_mosi_p1_29 &spi1a_sck_p1_26>;
+};
+
+&spi3 {
+	pinctrl-0 = <&spi3a_ss0_p0_19 &spi3a_miso_p0_20
+				&spi3a_mosi_p0_21 &spi3a_sck_p0_16>;
 };
 
 &dma0 {
@@ -124,7 +179,7 @@
 };
 
 &trng {
-	status = "okay";
+	status = "disabled";
 };
 
 &adc {

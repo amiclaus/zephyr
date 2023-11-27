@@ -195,16 +195,18 @@ static int adin2111_read_fifo(const struct device *dev, const uint8_t port)
 	cmd_buf[2] = 0U;
 #endif /* CONFIG_ETH_ADIN2111_SPI_CFG0 */
 
-	const struct spi_buf tx_buf = { .buf = cmd_buf, .len = sizeof(cmd_buf) };
-	const struct spi_buf rx_buf[3] = {
-		{.buf = NULL, .len = sizeof(cmd_buf) + ADIN2111_FRAME_HEADER_SIZE},
-		{.buf = ctx->buf, .len = fsize_real},
-		{.buf = NULL, .len = padding_len }
+	const struct spi_buf tx_buf = {
+		.buf = cmd_buf,
+		.len = 4 + ADIN2111_FRAME_HEADER_SIZE + fsize_real + padding_len
+	};
+	const struct spi_buf rx_buf = {
+		.buf = ctx->buf,
+		.len = 4 + ADIN2111_FRAME_HEADER_SIZE + fsize_real + padding_len
 	};
 	const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1U };
 	const struct spi_buf_set rx = {
-		.buffers = rx_buf,
-		.count = ((padding_len == 0U) ? 2U : 3U)
+		.buffers = &rx_buf,
+		.count = 1U
 	};
 
 	ret = spi_transceive_dt(&cfg->spi, &tx, &rx);
@@ -223,7 +225,7 @@ static int adin2111_read_fifo(const struct device *dev, const uint8_t port)
 		return -ENOMEM;
 	}
 
-	ret = net_pkt_write(pkt, ctx->buf, fsize_real);
+	ret = net_pkt_write(pkt, ctx->buf + 6, fsize_real);
 	if (ret < 0) {
 		eth_stats_update_errors_rx(iface);
 		net_pkt_unref(pkt);
