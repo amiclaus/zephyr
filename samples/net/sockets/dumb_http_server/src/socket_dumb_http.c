@@ -34,7 +34,7 @@
 
 static const char content[] = {
 #if USE_BIG_PAYLOAD
-    #include "response_big.html.bin.inc"
+    #include "dwsample1-html.html.inc"
 #else
     #include "response_small.html.bin.inc"
 #endif

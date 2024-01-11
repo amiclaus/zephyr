@@ -9,6 +9,7 @@ target_sources(app PRIVATE ${app_sources})
 
 set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
 
+generate_inc_file_for_target(app src/dwsample1-html.html ${gen_dir}/dwsample1-html.html.inc)
 generate_inc_file_for_target(app src/response_small.html.bin ${gen_dir}/response_small.html.bin.inc)
 generate_inc_file_for_target(app src/response_big.html.bin   ${gen_dir}/response_big.html.bin.inc)
 
