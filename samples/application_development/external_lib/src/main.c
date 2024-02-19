@@ -93,15 +93,32 @@ void main(void)
     int comp_data;
     
     ltc4296_write(0x8, 0x7300);
-    k_sleep(K_MSEC(1000));
+    k_sleep(K_MSEC(100));
 
     ltc4296_write(0x8, 0x0005);
     ltc4296_read(0x8, &data);
 
     printf("Check if unlocked. Read value %x\n", data);
 
+    ltc4296_write(0x14, 0x0109);
+    ltc4296_write(0x13, 0x00E1);
+
+    k_sleep(K_MSEC(100));
+
+    ltc4296_write(0x24, 0x0109);
+    ltc4296_write(0x23, 0x00E1);
+
+    k_sleep(K_MSEC(100));
+
+    ltc4296_write(0x34, 0x0109);
+    ltc4296_write(0x33, 0x00E1);
+
+    k_sleep(K_MSEC(100));
+
     ltc4296_write(0x44, 0x0109);
     ltc4296_write(0x43, 0x00E1);
+
+    k_sleep(K_MSEC(100));
 
     ltc4296_write(0x0A, 0x0041);
 
@@ -109,7 +126,7 @@ void main(void)
 
     printf("Get ADC raw data (gadcdat) value: %x\n", data);
 
-    comp_data = ((data & 0xFFF) - 2049) * 35230 / 1000000;
+    comp_data = ((data & 0xFFF) - 2049) * 6 / 1000;
 
     printf("Get ADC computed data (gadcdat) value: %d\n", comp_data);
 
@@ -117,7 +134,7 @@ void main(void)
 
     printf("Get ADC raw data (p3adcdat) %x\n", data);
 
-    comp_data = ((data & 0xFFF) - 2049) / 15;
+    comp_data = ((data & 0xFFF) - 2049) * 10 / 25;
 
     printf("Get ADC computed data (p3adcdat) value: %d\n", comp_data);
 }
