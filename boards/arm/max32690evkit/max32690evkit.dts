@@ -155,10 +155,11 @@
 				&spi0b_mosi_p2_28 &spi0b_sck_p2_29>;
 	pinctrl-names = "default";
 	status = "okay";
-	spidev: spi-device@1 {
-		compatible = "vnd,spi-device";
+	ltc4296: ltc4296@1 {
+		compatible = "adi,ltc4296";
 		spi-max-frequency = <500000>;
 		reg = <0x1>;
+		sccpo-gpios = <&gpio1 7 (GPIO_ACTIVE_HIGH | MAX32_GPIO_VSEL_VDDIOH)>;
 	};
 };
 
