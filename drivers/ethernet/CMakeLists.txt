@@ -35,6 +35,22 @@ zephyr_library_sources_ifdef(CONFIG_ETH_SMSC91X		eth_smsc91x.c)
 zephyr_library_sources_ifdef(CONFIG_ETH_IVSHMEM 	eth_ivshmem.c eth_ivshmem_queue.c)
 zephyr_library_sources_ifdef(CONFIG_ETH_ADIN2111	eth_adin2111.c)
 
+if(CONFIG_ETH_ADIN6310)
+  FILE(GLOB lib_adin6310_srcs ${LIB_ADIN6310_PATH}/src/ses-proxy-srv/src/*.c
+			      ${LIB_ADIN6310_PATH}/src/ses-route-srv/src/*.c
+			      ${LIB_ADIN6310_PATH}/src/ses-tsn-api-srv/src/*.c
+			      ${LIB_ADIN6310_PATH}/src/smp-stk/src/*.c
+  )
+  zephyr_library_sources(eth_adin6310.c)
+  zephyr_library_sources(${lib_adin6310_srcs})
+  zephyr_include_directories(${LIB_ADIN6310_PATH}/src/ses-proxy-srv/inc
+			     ${LIB_ADIN6310_PATH}/src/ses-route-srv/inc
+			     ${LIB_ADIN6310_PATH}/src/ses-tsn-api-srv/inc
+			     ${LIB_ADIN6310_PATH}/src/smp-stk/inc
+			     ${LIB_ADIN6310_PATH}/src/tsn-model-srv/inc
+  )
+endif()
+
 if(CONFIG_ETH_NXP_S32_NETC)
   zephyr_library_sources(eth_nxp_s32_netc.c)
   zephyr_library_sources_ifdef(CONFIG_DT_HAS_NXP_S32_NETC_PSI_ENABLED	eth_nxp_s32_netc_psi.c)
