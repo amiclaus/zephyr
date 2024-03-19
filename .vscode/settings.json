@@ -8,5 +8,8 @@
 
 		// File Associations
 		"files.associations": {
+			"ses_port_interface.h": "c",
+			"stdio.h": "c",
+			"util.h": "c"
 		}
 }
