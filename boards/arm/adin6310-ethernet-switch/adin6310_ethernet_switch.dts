@@ -186,6 +186,15 @@
 	// 		};
 	// 	};
 	// };
+	pinctrl-0 = <&spi0b_ss1_p2_26 &spi0b_miso_p2_27
+			&spi0b_mosi_p2_28 &spi0b_sck_p2_29>;
+	pinctrl-names = "default";
+	status = "okay";
+	ltc4296: ltc4296@1 {
+		compatible = "adi,ltc4296";
+		spi-max-frequency = <500000>;
+		reg = <0x1>;
+	};
 };
 
 &spi1 {
