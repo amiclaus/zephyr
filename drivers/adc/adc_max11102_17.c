@@ -102,7 +102,7 @@ static int max11102_17_channel_setup(const struct device *dev,
 		return -EINVAL;
 	}
 
-	if (channel_cfg->channel_id > config->channel_count) {
+	if (channel_cfg->channel_id >= config->channel_count) {
 		LOG_ERR("invalid channel selection %i", channel_cfg->channel_id);
 		return -EINVAL;
 	}
@@ -143,7 +143,7 @@ static int max11102_17_validate_sequence(const struct device *dev,
 			continue;
 		}
 
-		if (i > config->channel_count) {
+		if (i >= config->channel_count) {
 			LOG_ERR("invalid channel selection");
 			return -EINVAL;
 		}
