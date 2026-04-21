@@ -61,7 +61,7 @@ static int max14917_reg_trans_spi_diag(const struct device *dev)
 
 	/* If CRC enabled check it */
 	if (config->crc_en) {
-		crc = crc8(&local_tx_buff[0], 1, MAX14917_CRC_POLY, MAX14917_CRC_INI_VAL, false);
+		crc = crc8(&local_rx_buff[0], 1, MAX14917_CRC_POLY, MAX14917_CRC_INI_VAL, false);
 		crc = (crc & MAX14917_CRC_MASK);
 		if (crc != (local_rx_buff[1] & 0x1F)) {
 			LOG_ERR("READ CRC ERR (%d)-(%d)\n", crc, (local_rx_buff[1] & 0x1F));
