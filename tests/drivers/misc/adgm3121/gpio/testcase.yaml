@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Analog Devices Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  drivers.misc.adgm3121.gpio:
+    tags:
+      - drivers
+      - misc
+    harness: ztest
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
