@@ -1,0 +1,42 @@
+# Copyright (c) 2025 Analog Devices Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Analog Devices ADGM3053 4-channel crossover MEMS switch (DC-14GHz),
+  parallel GPIO control mode.
+
+  Each of the 4 MEMS switches is controlled by a dedicated GPIO pin
+  (IN1 through IN4).
+
+  Example:
+
+    adgm3053 {
+      compatible = "adi,adgm3053-gpio";
+      in1-gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+      in2-gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+      in3-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+      in4-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+    };
+
+compatible: "adi,adgm3053-gpio"
+
+properties:
+  in1-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW1 (S1-D1)
+
+  in2-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW2 (S2-D2)
+
+  in3-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW3 (S3-D3)
+
+  in4-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW4 (S4-D4)
