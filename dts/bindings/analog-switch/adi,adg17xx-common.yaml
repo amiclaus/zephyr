@@ -1,0 +1,27 @@
+# Copyright (c) 2026 Analog Devices Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Common properties for Analog Devices quad SPST analog switches in the
+  ADG17xx family driven by 4 dedicated GPIO control pins.
+
+properties:
+  in1-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW1.
+
+  in2-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW2.
+
+  in3-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW3.
+
+  in4-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW4.
