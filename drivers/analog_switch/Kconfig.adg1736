@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Analog Devices Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config ANALOG_SWITCH_ADG1736
+	bool "Analog Devices ADG736/ADG1736 dual SPDT analog switch driver"
+	default y
+	depends on DT_HAS_ADI_ADG736_ENABLED || \
+		   DT_HAS_ADI_ADG1736_ENABLED
+	depends on GPIO
+	help
+	  Enable driver for Analog Devices ADG736/ADG1736 dual SPDT analog
+	  switch. Each of the 2 switches is driven by a dedicated GPIO and
+	  the ADG1736 variant supports an optional enable pin.
