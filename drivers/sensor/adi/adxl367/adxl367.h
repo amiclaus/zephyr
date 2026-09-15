@@ -111,6 +111,14 @@
 #define ADXL367_AXIS_MASK	0x43u  /* Axis Mask Register */
 #define ADXL367_STATUS_COPY	0x44u  /* Status Copy Register */
 #define ADXL367_STATUS2		0x45u  /* Status 2 Register */
+#define ADXL367_STATUS_3	0x46u  /* Status 3 Register (ADXL366) */
+#define ADXL367_PED_STEP_CNT_H	0x47u  /* Pedometer Step Count [15:8] (ADXL366) */
+#define ADXL367_PED_STEP_CNT_L	0x48u  /* Pedometer Step Count [7:0] (ADXL366) */
+#define ADXL367_PED_CTL		0x49u  /* Pedometer Control (ADXL366) */
+#define ADXL367_PED_THRESH_H	0x4Au  /* Pedometer Threshold [14:8] (ADXL366) */
+#define ADXL367_PED_THRESH_L	0x4Bu  /* Pedometer Threshold [7:0] (ADXL366) */
+#define ADXL367_PED_SENS_H	0x4Cu  /* Pedometer Sensitivity [14:8] (ADXL366) */
+#define ADXL367_PED_SENS_L	0x4Du  /* Pedometer Sensitivity [7:0] (ADXL366) */
 
 #define ADXL367_DEVID_VAL	0xADu  /* Analog Devices accelerometer ID */
 #define ADXL367_MST_DEVID_VAL	0x1Du  /* Analog Devices MEMS device ID */
@@ -142,6 +150,17 @@
 #define ADXL367_ACT_INACT_CTL_INACT_EN_MSK		BIT(2)
 #define ADXL367_ACT_INACT_CTL_ACT_REF_MSK		BIT(1)
 #define ADXL367_ACT_INACT_CTL_ACT_EN_MSK		BIT(0)
+
+/* ADXL367_STATUS_3 (ADXL366) */
+#define ADXL367_STATUS_3_PED_OVERFLOW_MSK		BIT(0)
+
+/* ADXL367_PED_CTL (ADXL366) */
+#define ADXL367_PED_CTL_RESET_STEP_MSK			BIT(2)
+#define ADXL367_PED_CTL_RESET_OF_MSK			BIT(1)
+#define ADXL367_PED_CTL_EN_MSK				BIT(0)
+
+/* ADXL367_PED_THRESH_H / ADXL367_PED_SENS_H high-byte field (bits [14:8]) */
+#define ADXL367_PED_HIGH_MSK				GENMASK(6, 0)
 
 /* ADXL367_ACT_INACT_CTL_INACT_EN options */
 #define ADXL367_NO_INACTIVITY_DETECTION_ENABLED		0x0
@@ -231,6 +250,37 @@
 #define ADXL367_ACCEL_2G_LSB_PER_G	4000
 #define ADXL367_ACCEL_4G_LSB_PER_G	2000
 #define ADXL367_ACCEL_8G_LSB_PER_G	1000
+
+/**
+ * @brief ADXL366-specific sensor channels.
+ *
+ * The pedometer is an ADXL366-only feature; these channels return -ENOTSUP on
+ * the ADXL367.
+ */
+enum sensor_channel_adxl367 {
+	/** Pedometer step count (16-bit). */
+	SENSOR_CHAN_ADXL367_STEP_COUNT = SENSOR_CHAN_PRIV_START,
+	/** Pedometer overflow flag: 1 when the step count wrapped, else 0. */
+	SENSOR_CHAN_ADXL367_STEP_OVERFLOW,
+};
+
+/**
+ * @brief ADXL366-specific sensor attributes.
+ *
+ * The pedometer is an ADXL366-only feature; these attributes return -ENOTSUP on
+ * the ADXL367. Threshold and sensitivity are raw register values with a fixed
+ * scale of 4000 LSB/g (defaults 4000 LSB and 400 LSB respectively).
+ */
+enum sensor_attribute_adxl367 {
+	/** Enable (val1 != 0) or disable (val1 == 0) the pedometer. */
+	SENSOR_ATTR_ADXL367_PEDOMETER_ENABLE = SENSOR_ATTR_PRIV_START,
+	/** Reset the step count and overflow flag (val1 ignored). */
+	SENSOR_ATTR_ADXL367_PEDOMETER_RESET,
+	/** Pedometer threshold in val1, raw LSB (0..32767), 4000 LSB/g. */
+	SENSOR_ATTR_ADXL367_PEDOMETER_THRESHOLD,
+	/** Pedometer sensitivity in val1, raw LSB (0..32767), 4000 LSB/g. */
+	SENSOR_ATTR_ADXL367_PEDOMETER_SENSITIVITY,
+};
 
 enum adxl367_axis {
 	ADXL367_X_AXIS = 0x0,

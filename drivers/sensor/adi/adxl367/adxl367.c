@@ -867,17 +867,144 @@ static int adxl367_attr_set_odr(const struct device *dev,
 	return adxl367_set_output_rate(dev, odr);
 }
 
+/*
+ * The pedometer (registers 0x46 to 0x4D) is an ADXL366-only feature. All
+ * pedometer helpers return -ENOTSUP on the ADXL367.
+ */
+static int adxl367_pedometer_set_enable(const struct device *dev, bool enable)
+{
+	const struct adxl367_dev_config *cfg = dev->config;
+	struct adxl367_data *data = dev->data;
+
+	if (cfg->chip_id != ADXL366_CHIP_ID) {
+		return -ENOTSUP;
+	}
+
+	return data->hw_tf->write_reg_mask(dev, ADXL367_PED_CTL,
+					   ADXL367_PED_CTL_EN_MSK,
+					   FIELD_PREP(ADXL367_PED_CTL_EN_MSK, enable));
+}
+
+static int adxl367_pedometer_reset(const struct device *dev)
+{
+	const struct adxl367_dev_config *cfg = dev->config;
+	struct adxl367_data *data = dev->data;
+	uint8_t mask = ADXL367_PED_CTL_RESET_STEP_MSK | ADXL367_PED_CTL_RESET_OF_MSK;
+
+	if (cfg->chip_id != ADXL366_CHIP_ID) {
+		return -ENOTSUP;
+	}
+
+	/* Both reset bits are single-bit fields, so the value equals the mask. */
+	return data->hw_tf->write_reg_mask(dev, ADXL367_PED_CTL, mask, mask);
+}
+
+static int adxl367_pedometer_set_threshold(const struct device *dev, uint16_t thresh)
+{
+	const struct adxl367_dev_config *cfg = dev->config;
+	struct adxl367_data *data = dev->data;
+	int ret;
+
+	if (cfg->chip_id != ADXL366_CHIP_ID) {
+		return -ENOTSUP;
+	}
+
+	ret = data->hw_tf->write_reg_mask(dev, ADXL367_PED_THRESH_H,
+					  ADXL367_PED_HIGH_MSK,
+					  FIELD_PREP(ADXL367_PED_HIGH_MSK, thresh >> 8));
+	if (ret != 0) {
+		return ret;
+	}
+
+	return data->hw_tf->write_reg(dev, ADXL367_PED_THRESH_L, thresh & 0xFFu);
+}
+
+static int adxl367_pedometer_set_sensitivity(const struct device *dev, uint16_t sens)
+{
+	const struct adxl367_dev_config *cfg = dev->config;
+	struct adxl367_data *data = dev->data;
+	int ret;
+
+	if (cfg->chip_id != ADXL366_CHIP_ID) {
+		return -ENOTSUP;
+	}
+
+	ret = data->hw_tf->write_reg_mask(dev, ADXL367_PED_SENS_H,
+					  ADXL367_PED_HIGH_MSK,
+					  FIELD_PREP(ADXL367_PED_HIGH_MSK, sens >> 8));
+	if (ret != 0) {
+		return ret;
+	}
+
+	return data->hw_tf->write_reg(dev, ADXL367_PED_SENS_L, sens & 0xFFu);
+}
+
+static int adxl367_pedometer_get_steps(const struct device *dev, uint16_t *steps)
+{
+	const struct adxl367_dev_config *cfg = dev->config;
+	struct adxl367_data *data = dev->data;
+	uint8_t high, low;
+	int ret;
+
+	if (cfg->chip_id != ADXL366_CHIP_ID) {
+		return -ENOTSUP;
+	}
+
+	ret = data->hw_tf->read_reg(dev, ADXL367_PED_STEP_CNT_H, &high);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = data->hw_tf->read_reg(dev, ADXL367_PED_STEP_CNT_L, &low);
+	if (ret != 0) {
+		return ret;
+	}
+
+	*steps = ((uint16_t)high << 8) | low;
+
+	return 0;
+}
+
+static int adxl367_pedometer_get_overflow(const struct device *dev, bool *overflow)
+{
+	const struct adxl367_dev_config *cfg = dev->config;
+	struct adxl367_data *data = dev->data;
+	uint8_t val;
+	int ret;
+
+	if (cfg->chip_id != ADXL366_CHIP_ID) {
+		return -ENOTSUP;
+	}
+
+	ret = data->hw_tf->read_reg(dev, ADXL367_STATUS_3, &val);
+	if (ret != 0) {
+		return ret;
+	}
+
+	*overflow = (val & ADXL367_STATUS_3_PED_OVERFLOW_MSK) != 0;
+
+	return 0;
+}
+
 static int adxl367_attr_set(const struct device *dev,
 			    enum sensor_channel chan,
 			    enum sensor_attribute attr,
 			    const struct sensor_value *val)
 {
-	switch (attr) {
+	switch ((int)attr) {
 	case SENSOR_ATTR_SAMPLING_FREQUENCY:
 		return adxl367_attr_set_odr(dev, chan, attr, val);
 	case SENSOR_ATTR_UPPER_THRESH:
 	case SENSOR_ATTR_LOWER_THRESH:
 		return adxl367_attr_set_thresh(dev, chan, attr, val);
+	case SENSOR_ATTR_ADXL367_PEDOMETER_ENABLE:
+		return adxl367_pedometer_set_enable(dev, val->val1 != 0);
+	case SENSOR_ATTR_ADXL367_PEDOMETER_RESET:
+		return adxl367_pedometer_reset(dev);
+	case SENSOR_ATTR_ADXL367_PEDOMETER_THRESHOLD:
+		return adxl367_pedometer_set_threshold(dev, (uint16_t)val->val1);
+	case SENSOR_ATTR_ADXL367_PEDOMETER_SENSITIVITY:
+		return adxl367_pedometer_set_sensitivity(dev, (uint16_t)val->val1);
 	default:
 		return -ENOTSUP;
 	}
@@ -936,7 +1063,7 @@ static int adxl367_channel_get(const struct device *dev,
 {
 	struct adxl367_data *data = dev->data;
 
-	switch (chan) {
+	switch ((int)chan) {
 	case SENSOR_CHAN_ACCEL_X:
 		adxl367_accel_convert(val, data->sample.x, data->range);
 		break;
@@ -954,6 +1081,28 @@ static int adxl367_channel_get(const struct device *dev,
 	case SENSOR_CHAN_DIE_TEMP:
 		adxl367_temp_convert(val, data->temp_val);
 		break;
+	case SENSOR_CHAN_ADXL367_STEP_COUNT: {
+		uint16_t steps;
+		int ret = adxl367_pedometer_get_steps(dev, &steps);
+
+		if (ret != 0) {
+			return ret;
+		}
+		val->val1 = steps;
+		val->val2 = 0;
+		break;
+	}
+	case SENSOR_CHAN_ADXL367_STEP_OVERFLOW: {
+		bool overflow;
+		int ret = adxl367_pedometer_get_overflow(dev, &overflow);
+
+		if (ret != 0) {
+			return ret;
+		}
+		val->val1 = overflow ? 1 : 0;
+		val->val2 = 0;
+		break;
+	}
 	default:
 		return -ENOTSUP;
 	}
