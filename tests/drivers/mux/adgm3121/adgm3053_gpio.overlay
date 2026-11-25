@@ -1,0 +1,31 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Analog Devices Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * ADGM3053 GPIO-control fixture on native_sim. Four emulated GPIO lines
+ * drive the four port switches; the test observes them with
+ * gpio_emul_output_get_dt().
+ */
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+	adgm3053: adgm3053 {
+		compatible = "adi,adgm3053-gpio";
+		in1-gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+		in2-gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+		in3-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+		in4-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+		#mux-control-cells = <0>;
+		#mux-state-cells = <1>;
+		status = "okay";
+	};
+
+	mux_consumer: mux-consumer {
+		compatible = "vnd,mux-consumer-test";
+		mux-controls = <&adgm3053>;
+		mux-states = <&adgm3053 0xc>;
+		status = "okay";
+	};
+};

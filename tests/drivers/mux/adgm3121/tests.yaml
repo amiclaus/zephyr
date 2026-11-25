@@ -16,3 +16,13 @@ tests:
       - native_sim
     extra_configs:
       - CONFIG_TEST_ADGM3121_OBSERVE_GPIO=y
+  drivers.mux.adgm3053.gpio:
+    filter: dt_compat_enabled("adi,adgm3053-gpio")
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
+    extra_args:
+      - DTC_OVERLAY_FILE="adgm3053_gpio.overlay"
+    extra_configs:
+      - CONFIG_TEST_ADGM3121_OBSERVE_GPIO=y

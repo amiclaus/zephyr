@@ -9,8 +9,11 @@
  * drives the mask with mux_control_set(), opens all switches with
  * mux_control_disconnect(), and reads the mask back with mux_state_get().
  *
- * On the GPIO-control fixture (native_sim) it additionally confirms the four
+ * On the GPIO-control fixtures (native_sim) it additionally confirms the four
  * switch lines physically follow the mask via gpio_emul_output_get_dt().
+ *
+ * The ADGM3053 has no all-open state, so on that part the suite checks that
+ * mux_control_disconnect() is rejected and leaves the switches untouched.
  */
 
 #include <zephyr/device.h>
@@ -18,15 +21,22 @@
 #include <zephyr/drivers/mux.h>
 #include <zephyr/ztest.h>
 
+/* Controller under test, referenced by the consumer's mux-controls. */
+#define MUX_NODE DT_PHANDLE(DT_NODELABEL(mux_consumer), mux_controls)
+
+#define MUX_IS_ADGM3053                                                                            \
+	(DT_NODE_HAS_COMPAT(MUX_NODE, adi_adgm3053) ||                                             \
+	 DT_NODE_HAS_COMPAT(MUX_NODE, adi_adgm3053_gpio))
+
 #if IS_ENABLED(CONFIG_TEST_ADGM3121_OBSERVE_GPIO)
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/gpio/gpio_emul.h>
 
 static const struct gpio_dt_spec in_gpios[4] = {
-	GPIO_DT_SPEC_GET(DT_NODELABEL(adgm3121), in1_gpios),
-	GPIO_DT_SPEC_GET(DT_NODELABEL(adgm3121), in2_gpios),
-	GPIO_DT_SPEC_GET(DT_NODELABEL(adgm3121), in3_gpios),
-	GPIO_DT_SPEC_GET(DT_NODELABEL(adgm3121), in4_gpios),
+	GPIO_DT_SPEC_GET(MUX_NODE, in1_gpios),
+	GPIO_DT_SPEC_GET(MUX_NODE, in2_gpios),
+	GPIO_DT_SPEC_GET(MUX_NODE, in3_gpios),
+	GPIO_DT_SPEC_GET(MUX_NODE, in4_gpios),
 };
 
 static void assert_switch_lines(uint8_t mask)
@@ -62,6 +72,10 @@ ZTEST(adgm3121, test_set_disconnect_reconnect)
 	const struct mux_control *ctrl = MUX_CONTROL_DT_GET(CONSUMER);
 	uint32_t state;
 
+	if (MUX_IS_ADGM3053) {
+		ztest_test_skip();
+	}
+
 	/* Set a mix of switches: SW2 + SW4 closed. */
 	zassert_ok(mux_control_set(mux_dev, ctrl, 0x0A), "set 0x0A failed");
 	zassert_ok(mux_state_get(mux_dev, ctrl, &state), "get failed");
@@ -78,6 +92,35 @@ ZTEST(adgm3121, test_set_disconnect_reconnect)
 	zassert_ok(mux_control_set(mux_dev, ctrl, 0x05), "reconnect set 0x05 failed");
 	zassert_ok(mux_state_get(mux_dev, ctrl, &state), "get after reconnect failed");
 	zassert_equal(state, 0x05, "read-back should track the reconnect mask");
+	assert_switch_lines(0x05);
+}
+
+ZTEST(adgm3121, test_disconnect_unsupported)
+{
+	const struct mux_control *ctrl = MUX_CONTROL_DT_GET(CONSUMER);
+	uint32_t state;
+
+	if (!MUX_IS_ADGM3053) {
+		ztest_test_skip();
+	}
+
+	/* SW2 + SW4 closed: S2-D2, S4-D4, S1 and S3 joined by the crossover. */
+	zassert_ok(mux_control_set(mux_dev, ctrl, 0x0A), "set 0x0A failed");
+	zassert_ok(mux_state_get(mux_dev, ctrl, &state), "get failed");
+	zassert_equal(state, 0x0A, "read-back should match the set mask");
+	assert_switch_lines(0x0A);
+
+	/* Opening all switches would join S1..S4, so disconnect() is rejected. */
+	zassert_equal(mux_control_disconnect(mux_dev, ctrl), -ENOSYS,
+		      "disconnect should be unsupported");
+	zassert_ok(mux_state_get(mux_dev, ctrl, &state), "get after disconnect failed");
+	zassert_equal(state, 0x0A, "rejected disconnect should keep the mask");
+	assert_switch_lines(0x0A);
+
+	/* SW1 + SW3 closed: S1-D1, S3-D3, S2 and S4 joined by the crossover. */
+	zassert_ok(mux_control_set(mux_dev, ctrl, 0x05), "set 0x05 failed");
+	zassert_ok(mux_state_get(mux_dev, ctrl, &state), "get failed");
+	zassert_equal(state, 0x05, "read-back should match the set mask");
 	assert_switch_lines(0x05);
 }
 
