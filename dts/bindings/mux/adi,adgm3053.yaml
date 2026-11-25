@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Analog Devices Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Analog Devices ADGM3053 4-channel MEMS crossover switch (DC-14GHz), SPI
+  control mode, exposed as a MUX controller.
+
+  Each source Sx (S1..S4) is routed either to its drain Dx through its port
+  switch (SW1..SW4) or to the internal crossover path shared by all sources.
+  The four switches are modeled as a single control line whose state is a
+  4-bit switch bitmask: bit i set routes S(i+1) to D(i+1), bit i clear routes
+  S(i+1) to the crossover path. All sources with a clear bit are connected
+  together, for example 0xc routes S3 to D3 and S4 to D4 and connects S1 to
+  S2.
+
+  No state leaves every source unrouted, so mux_control_disconnect() returns
+  -ENOSYS.
+
+compatible: "adi,adgm3053"
+
+include: [spi-device.yaml, mux-controller.yaml]
+
+properties:
+  "#mux-control-cells":
+    const: 0
+
+  "#mux-state-cells":
+    const: 1
+
+mux-state-cells:
+  - switches
+
+examples:
+  - |
+    &spi1 {
+            adgm3053: adgm3053@0 {
+                    compatible = "adi,adgm3053";
+                    reg = <0>;
+                    spi-max-frequency = <10000000>;
+                    #mux-control-cells = <0>;
+                    #mux-state-cells = <1>;
+            };
+    };
+
+    consumer {
+            mux-controls = <&adgm3053>;        /* runtime switch mask */
+            mux-states   = <&adgm3053 0xc>;    /* static: S3-D3, S4-D4, S1-S2 */
+    };

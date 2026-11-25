@@ -3,16 +3,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 config MUX_ADI_ADGM3121
-	bool "ADI ADGM3121 MEMS switch MUX driver"
+	bool "ADI ADGM3121/ADGM3053 MEMS switch MUX driver"
 	default y
-	depends on DT_HAS_ADI_ADGM3121_ENABLED || DT_HAS_ADI_ADGM3121_GPIO_ENABLED
-	select SPI if DT_HAS_ADI_ADGM3121_ENABLED
-	select GPIO if DT_HAS_ADI_ADGM3121_GPIO_ENABLED
+	depends on DT_HAS_ADI_ADGM3121_ENABLED || DT_HAS_ADI_ADGM3121_GPIO_ENABLED || \
+		DT_HAS_ADI_ADGM3053_ENABLED || DT_HAS_ADI_ADGM3053_GPIO_ENABLED
+	select SPI if DT_HAS_ADI_ADGM3121_ENABLED || DT_HAS_ADI_ADGM3053_ENABLED
+	select GPIO if DT_HAS_ADI_ADGM3121_GPIO_ENABLED || DT_HAS_ADI_ADGM3053_GPIO_ENABLED
 	help
-	  Enable the ADI ADGM3121 DPDT MEMS switch as a MUX controller. The four
-	  switches are exposed as a single control line whose state is a 4-bit
-	  switch bitmask (bit i = SW(i+1)). Both SPI (adi,adgm3121) and parallel
-	  GPIO (adi,adgm3121-gpio) control modes are supported.
+	  Enable the ADI ADGM3121 DPDT MEMS switch and the ADGM3053 4-channel
+	  MEMS crossover switch as a MUX controller. The four switches are
+	  exposed as a single control line whose state is a 4-bit switch bitmask
+	  (bit i = SW(i+1)). Both SPI (adi,adgm3121, adi,adgm3053) and parallel
+	  GPIO (adi,adgm3121-gpio, adi,adgm3053-gpio) control modes are
+	  supported.
 
 if MUX_ADI_ADGM3121
 

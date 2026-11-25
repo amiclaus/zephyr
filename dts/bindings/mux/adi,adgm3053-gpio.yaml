@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2026 Analog Devices Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Analog Devices ADGM3053 4-channel MEMS crossover switch (DC-14GHz), parallel
+  GPIO control mode, exposed as a MUX controller.
+
+  Each source Sx (S1..S4) is routed either to its drain Dx through its port
+  switch (SW1..SW4) or to the internal crossover path shared by all sources.
+  Each port switch is controlled by a dedicated GPIO pin (IN1..IN4). The four
+  switches are modeled as a single control line whose state is a 4-bit switch
+  bitmask: bit i set routes S(i+1) to D(i+1), bit i clear routes S(i+1) to the
+  crossover path. All sources with a clear bit are connected together, for
+  example 0xc routes S3 to D3 and S4 to D4 and connects S1 to S2.
+
+  No state leaves every source unrouted, so mux_control_disconnect() returns
+  -ENOSYS.
+
+compatible: "adi,adgm3053-gpio"
+
+include: [base.yaml, mux-controller.yaml]
+
+properties:
+  in1-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW1 (S1-D1).
+
+  in2-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW2 (S2-D2).
+
+  in3-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW3 (S3-D3).
+
+  in4-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO controlling switch SW4 (S4-D4).
+
+  "#mux-control-cells":
+    const: 0
+
+  "#mux-state-cells":
+    const: 1
+
+mux-state-cells:
+  - switches
+
+examples:
+  - |
+    #include <zephyr/dt-bindings/gpio/gpio.h>
+
+    adgm3053 {
+            compatible = "adi,adgm3053-gpio";
+            in1-gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+            in2-gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+            in3-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+            in4-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+            #mux-control-cells = <0>;
+            #mux-state-cells = <1>;
+    };
